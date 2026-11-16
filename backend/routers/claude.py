@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from core.responses import api_response, derived_response, fixed_response
 from schemas.accounts import ProviderAuth
-from services import accounts, asset_icons, claude_assets, claude_manage, cli_login, plugin_updates
+from services import accounts, asset_icons, claude_assets, claude_manage, cli_login, plugin_secrets, plugin_updates
 from services import claude_status
 from services import usage as usage_service
 
@@ -208,7 +208,10 @@ def plugin_options(plugin: str):
 
 @router.put("/claude/plugins/options")
 def set_plugin_options(body: PluginOptionsBody):
-    return api_response(data=claude_manage.set_plugin_options(body.plugin, body.values))
+    result = claude_manage.set_plugin_options(body.plugin, body.values)
+    if result["ok"]:
+        plugin_secrets.share(body.plugin, body.values)
+    return api_response(data=result)
 
 
 @router.post("/claude/plugins/local")

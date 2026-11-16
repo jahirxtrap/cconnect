@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -42,20 +43,25 @@ def _cli() -> str | None:
     return cli_manager.resolve_cli_path() or cli_manager.system_cli()
 
 
-def _exec(args: list[str], timeout: int, cwd: str | None, stdin: str | None) -> subprocess.CompletedProcess:
+def _exec(
+    args: list[str], timeout: int, cwd: str | None, stdin: str | None, env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess:
     cli = _cli()
     if not cli:
         raise OSError("No CLI available")
     return subprocess.run(
         [cli, *args],
         input=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=timeout, cwd=cwd,
+        timeout=timeout, cwd=cwd, env=env,
     )
 
 
-def _run(args: list[str], timeout: int = _ACTION_TIMEOUT, cwd: str | None = None, stdin: str | None = None) -> dict:
+def _run(
+    args: list[str], timeout: int = _ACTION_TIMEOUT, cwd: str | None = None, stdin: str | None = None,
+    env: dict[str, str] | None = None,
+) -> dict:
     try:
-        result = _exec(args, timeout, cwd, stdin)
+        result = _exec(args, timeout, cwd, stdin, env)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "message": str(exc)}
     output = (result.stdout + result.stderr).strip()
@@ -203,6 +209,14 @@ def plugin_options(plugin: str) -> dict | None:
 def set_plugin_options(plugin: str, values: dict[str, str]) -> dict:
     cwd = _plugin_place(plugin)[1]
     return _run(["plugin", "configure", "--values-stdin", plugin], cwd=cwd, stdin=json.dumps(values))
+
+
+def configure_secrets(plugin: str, values: dict[str, str], storage: str) -> bool:
+    env = {name: value for name, value in os.environ.items() if name != accounts.SECURE_STORAGE_VAR}
+    if storage:
+        env[accounts.SECURE_STORAGE_VAR] = storage
+    result = _run(["plugin", "configure", "--values-stdin", plugin], cwd=_plugin_place(plugin)[1], stdin=json.dumps(values), env=env)
+    return result["ok"]
 
 
 def add_local_plugin(source: str) -> dict:

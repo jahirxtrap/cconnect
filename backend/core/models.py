@@ -462,3 +462,25 @@ class Device(Base):
         server_default=text(NOW),
         comment="When it was last connected, in UTC; the panel lists saved devices newest first",
     )
+
+
+class PluginSecretMark(Base):
+    __tablename__ = "plugin_secret_marks"
+    __table_args__ = {"comment": "What each account held of every plugin's secret options when CConnect last made them the same in all accounts, to tell which account changed one since"}
+
+    storage: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Secure storage folder the CLI of an account keeps its secrets in (CLAUDE_SECURESTORAGE_CONFIG_DIR); empty for the primary account",
+    )
+    plugin: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Plugin id, name@marketplace, as the CLI keys its secret options",
+    )
+    fingerprint: Mapped[str] = mapped_column(
+        comment="SHA-256 of the plugin's secret option values in that storage when they last matched every account, never the values themselves; a storage that differs from it changed since",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When the fingerprint was last recorded, in UTC",
+    )

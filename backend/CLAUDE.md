@@ -59,6 +59,13 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
   config). Sign-in goes through the CLI's control requests (`claude_authenticate`,
   `mcp_authenticate`), never a pseudo-terminal. `wait_mcp` watches `.credentials.json` because the
   CLI reports no event when an MCP login finishes. `login_expiry` caches per `.credentials.json`.
+- `services/plugin_secrets` — the CLI keeps a plugin's sensitive options in the secure storage,
+  so each account would hold its own. `reconcile` (before a chat's CLI starts) gives every account
+  what another holds, through each account's `claude plugin configure`; a fingerprint per storage
+  and plugin (`plugin_secret_marks`, never the values) tells which account changed one, the newest
+  winning, and a plugin not installed is skipped. Saving options from the app (`share`) writes
+  the secret ones to every account, also where they live in the macOS keychain, which `reconcile`
+  cannot read. MCP and account logins stay per account.
 - Every conversation CLI gets its environment from `claude_runtime._cli_env`; a provider model
   without a known window gets `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`.
 - `mcps/` — the in-process MCP server Claude sees as `cconnect`.

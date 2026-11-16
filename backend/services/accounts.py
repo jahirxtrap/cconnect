@@ -36,10 +36,11 @@ _DELETING = ".deleting"
 _ID_RE = re.compile(r"[^a-z0-9-]+")
 
 SECURE_STORAGE_VAR = "CLAUDE_SECURESTORAGE_CONFIG_DIR"
-_CREDENTIALS_FILE = ".credentials.json"
+PRIMARY_STORAGE = ""
+CREDENTIALS_FILE = ".credentials.json"
 _PLUGIN_SECRETS = "pluginSecrets"
 _IDENTITY_FILE = ".claude.json"
-_BUNDLE_FILES = (_CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
+_BUNDLE_FILES = (CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
 _AUTH_STATUS_TIMEOUT = 20
 _IDENTITY_KEYS = ("oauthAccount", "userID")
 _EMAIL_KEY = "emailAddress"
@@ -144,17 +145,28 @@ def identity_env(account_id: Optional[str]) -> dict[str, str]:
 
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
-    return (config_dir(account_id) or primary_dir()) / _CREDENTIALS_FILE
+    return (config_dir(account_id) or primary_dir()) / CREDENTIALS_FILE
 
 
-def plugin_secrets(plugin: str, storage: Optional[str]) -> dict[str, Any]:
+def secure_storages() -> dict[str, Path]:
+    """Each account's secure storage folder, keyed by its CLAUDE_SECURESTORAGE_CONFIG_DIR value."""
+    found = {PRIMARY_STORAGE: primary_dir()}
+    for entry in _account_dirs():
+        found[str(entry)] = entry
+    return found
+
+
+def stored_plugin_secrets(folder: Path) -> dict[str, dict[str, Any]]:
     try:
-        data = json.loads((Path(storage) / _CREDENTIALS_FILE if storage else credentials_path()).read_text(encoding="utf-8"))
+        data = json.loads((folder / CREDENTIALS_FILE).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
     kept = data.get(_PLUGIN_SECRETS) if isinstance(data, dict) else None
-    found = kept.get(plugin) if isinstance(kept, dict) else None
-    return found if isinstance(found, dict) else {}
+    return {plugin: values for plugin, values in kept.items() if isinstance(values, dict)} if isinstance(kept, dict) else {}
+
+
+def plugin_secrets(plugin: str, storage: Optional[str]) -> dict[str, Any]:
+    return stored_plugin_secrets(Path(storage) if storage else primary_dir()).get(plugin, {})
 
 
 def _login_stamp(account_id: str) -> Optional[list[int]]:
@@ -475,7 +487,7 @@ def export_bundle(account_id: str) -> Optional[bytes]:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
         if credentials.is_file():
-            bundle.writestr(_CREDENTIALS_FILE, credentials.read_bytes())
+            bundle.writestr(CREDENTIALS_FILE, credentials.read_bytes())
         fallback = PRIMARY_LABEL if account_id == PRIMARY_ID else account_id
         meta = {"label": _label(base, fallback)}
         if provider:
@@ -501,10 +513,10 @@ def _read_bundle(data: bytes) -> Optional[dict[str, bytes]]:
             payload = {name: bundle.read(name) for name in _BUNDLE_FILES if name in names}
     except (zipfile.BadZipFile, OSError, KeyError):
         return None
-    if _CREDENTIALS_FILE not in payload:
+    if CREDENTIALS_FILE not in payload:
         return payload if _bundle_provider(payload) else None
     try:
-        json.loads(payload[_CREDENTIALS_FILE])
+        json.loads(payload[CREDENTIALS_FILE])
     except json.JSONDecodeError:
         return None
     return payload
@@ -551,8 +563,8 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
         return None
     account = create(label.strip() or _bundle_label(payload) or "Account")
     path = paths.ACCOUNTS_DIR / account["id"]
-    if _CREDENTIALS_FILE in payload:
-        (path / _CREDENTIALS_FILE).write_bytes(payload[_CREDENTIALS_FILE])
+    if CREDENTIALS_FILE in payload:
+        (path / CREDENTIALS_FILE).write_bytes(payload[CREDENTIALS_FILE])
     _merge_identity(path / _IDENTITY_FILE, payload.get(_IDENTITY_FILE))
     provider = _bundle_provider(payload)
     if provider:

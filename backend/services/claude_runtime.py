@@ -20,7 +20,7 @@ from mcps import databases as database_tools
 from mcps.media import block_types, single_media
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, control_requests, delegates, device_tools, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, control_requests, delegates, device_tools, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, plugin_secrets, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -837,6 +837,7 @@ async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=Fa
     """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
     fresh = not resident.connected
     if fresh:
+        await asyncio.to_thread(plugin_secrets.reconcile)
         resident.lazy = await mcp_lazy.open_for(options, lambda: resident.session_info().get("session_id"))
         await resident.connect(resident.lazy.apply(options) if resident.lazy is not None else options)
     from claude_agent_sdk import ResultMessage
@@ -1227,6 +1228,7 @@ async def run_prompt(
             resident.bind(persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, reload, session_info))
             source = _resident_stream(resident, options, prompt_arg, on_transport, adopt, retune)
         else:
+            await asyncio.to_thread(plugin_secrets.reconcile)
             lazy = await mcp_lazy.open_for(options, lambda: current_sid or resume)
             if lazy is not None:
                 options = lazy.apply(options)

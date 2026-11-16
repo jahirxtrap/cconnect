@@ -223,6 +223,14 @@ def _option_allowed(field: dict, value: Any) -> bool:
     return all(item in choices for item in value) if isinstance(value, list) else value in choices
 
 
+def secret_options(plugin: str) -> set[str]:
+    root = plugin_root(plugin)
+    schema = read_manifest(root).get("userConfig") if root is not None else None
+    if not isinstance(schema, dict):
+        return set()
+    return {key for key, field in schema.items() if isinstance(field, dict) and field.get("sensitive") is True}
+
+
 def option_values(plugin: dict, storage: str | None) -> dict[str, str]:
     """The text Claude Code puts in a plugin's ${user_config.*}, left out where it is unset and required, or kept in the keychain."""
     root = plugin.get("install_path")
