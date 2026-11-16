@@ -230,7 +230,9 @@ manifest's default, and an empty string for an optional field.
 
 - `initialize` and every list come from `mcp_catalogs` (keyed by command, arguments and
   environment), so the CLI starts with no server process. A server with no catalog starts as
-  before while one is read in the background.
+  before while one is read in the background. The key keeps a plugin's `${user_config.*}` as
+  placeholders: accounts hold their own option values, and storing a catalog drops the other
+  keys of that server name, so per-account keys evicted each other on every chat.
 - The real process starts on the first call (`_Link`) with the environment the CLI would give
   it. Every start rereads the lists and sends `list_changed` when they changed.
 - The first start per backend run goes through the launcher (`uvx`, `npx`); later ones run the

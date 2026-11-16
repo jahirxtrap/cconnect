@@ -126,6 +126,15 @@ def _option_vars(plugin: Optional[dict], env: dict[str, str]) -> dict[str, str]:
     return {f"{_USER_CONFIG}{key}": value for key, value in values.items()}
 
 
+def _expanded(cfg: dict[str, Any], known: dict[str, str]) -> Optional[tuple[str, list[str], dict[str, str]]]:
+    command = _expand(cfg["command"], known)
+    args = [_expand(str(arg), known) for arg in cfg.get("args") or []]
+    own = {str(name): _expand(str(value), known) for name, value in (cfg.get("env") or {}).items()}
+    if command is None or None in args or None in own.values():
+        return None
+    return command, args, own
+
+
 def _specs(cwd: str, env: dict[str, str]) -> list[Spec]:
     specs = []
     for server in claude_assets.declared_mcp(cwd):
@@ -135,13 +144,13 @@ def _specs(cwd: str, env: dict[str, str]) -> list[Spec]:
         if (cfg.get("type") or "stdio") != "stdio" or not isinstance(cfg.get("command"), str):
             continue
         plugin = _plugin_vars(server.plugin)
-        known = {**env, **plugin, **_option_vars(server.plugin, env)}
-        command = _expand(cfg["command"], known)
-        args = [_expand(str(arg), known) for arg in cfg.get("args") or []]
-        own = {str(name): _expand(str(value), known) for name, value in (cfg.get("env") or {}).items()}
-        if command is None or None in args or None in own.values():
+        options = _option_vars(server.plugin, env)
+        launch = _expanded(cfg, {**env, **plugin, **options})
+        if launch is None:
             continue
-        key = hashlib.sha256(json.dumps([server.name, command, args, own, plugin], sort_keys=True).encode()).hexdigest()
+        shape = _expanded(cfg, {**env, **plugin, **{name: f"${{{name}}}" for name in options}})
+        key = hashlib.sha256(json.dumps([server.name, *shape, plugin], sort_keys=True).encode()).hexdigest()
+        command, args, own = launch
         entry = {name: cfg[name] for name in _ENTRY_KEYS if name in cfg}
         specs.append(Spec(server.name, command, tuple(args), {**plugin, **own}, entry, key))
     return specs
