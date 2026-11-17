@@ -610,6 +610,8 @@
   "CHANGELOG": "Neuerungen",
   "SUGGESTIONS": "Vorschläge für nächste Schritte",
   "SUGGESTIONS_DESC": "Das Modell beendet seine Antwort mit Schaltflächen, die eine Nachricht senden oder sie zum Fertigschreiben ins Eingabefeld setzen",
+  "DRAWINGS": "Zeichnungen in Antworten",
+  "DRAWINGS_DESC": "Das Modell antwortet mit einer Zeichnung, wenn ein Bild etwas besser erklärt als Text: eine Checkliste, ein Diagramm oder eine Skizze",
   "DISCORD_PRESENCE": "Discord-Aktivität",
   "DISCORD_PRESENCE_SUMMARY": "In deinem Discord-Profil zeigen, was du gerade machst",
   "DISCORD_FIELD_STATUS": "Status",

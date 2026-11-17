@@ -149,7 +149,7 @@ async def _summarize(project_key: str, session_id: Optional[str] = None, account
 
 CHECK_PROGRESS = Definition(
     "check_progress",
-    "Summarize the progress of work happening in another Claude Code project — "
+    "Summarize the progress of work happening in another Claude Code project: "
     "what is done, what is pending, which files were touched, and the likely next "
     "step. Use this when the user asks how a task left running in another project "
     "or folder is going. Pass the user's reference verbatim as a folder name, path, "

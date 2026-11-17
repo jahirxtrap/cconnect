@@ -10,6 +10,7 @@ export interface SettingsSnapshot {
   todoTools: boolean;
   browserView: boolean;
   suggestions: boolean;
+  drawings: boolean;
   sdkAutoUpdate: boolean;
   persistentSessions: boolean;
   sessionGrace: number;
@@ -56,6 +57,7 @@ export interface SettingsPatch {
   todo_tools?: boolean;
   browser_view?: boolean;
   suggestions?: boolean;
+  drawings?: boolean;
   sdk_auto_update?: boolean;
   persistent_sessions?: boolean;
   session_grace?: number;
@@ -131,6 +133,7 @@ export const parseSettings = (wire: SettingsWire): SettingsSnapshot => ({
   todoTools: effectiveBool(wire, "todo_tools", false),
   browserView: effectiveBool(wire, "browser_view", false),
   suggestions: effectiveBool(wire, "suggestions", true),
+  drawings: effectiveBool(wire, "drawings", false),
   sdkAutoUpdate: effectiveBool(wire, "sdk_auto_update", true),
   persistentSessions: effectiveBool(wire, "persistent_sessions", true),
   sessionGrace: effectiveNum(wire, "session_grace", 300),

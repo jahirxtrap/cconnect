@@ -610,6 +610,8 @@
   "CHANGELOG": "更新日志",
   "SUGGESTIONS": "后续步骤建议",
   "SUGGESTIONS_DESC": "模型在每轮结束时给出按钮，可直接发送消息，或将其填入输入框供你补充完成",
+  "DRAWINGS": "回复中的绘图",
+  "DRAWINGS_DESC": "当图比文字更能说明问题时，模型会用绘图回复，例如清单、示意图或草图",
   "DISCORD_PRESENCE": "Discord 状态",
   "DISCORD_PRESENCE_SUMMARY": "在你的 Discord 个人资料中显示你正在做什么",
   "DISCORD_FIELD_STATUS": "状态",

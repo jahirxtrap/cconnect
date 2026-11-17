@@ -12,14 +12,16 @@
     disabled: string;
     browserView: boolean;
     suggestions: boolean;
-    onConfirm: (disabled: string, browserView: boolean, suggestions: boolean) => void;
+    drawings: boolean;
+    onConfirm: (disabled: string, browserView: boolean, suggestions: boolean, drawings: boolean) => void;
     onDismiss: () => void;
   }
 
-  const { tools, disabled, browserView, suggestions, onConfirm, onDismiss }: Props = $props();
+  const { tools, disabled, browserView, suggestions, drawings, onConfirm, onDismiss }: Props = $props();
 
   let browser = $state(untrack(() => browserView));
   let hints = $state(untrack(() => suggestions));
+  let sketches = $state(untrack(() => drawings));
 
   let hidden = $state(
     untrack(() => new Set(disabled.split(",").map((name) => name.trim()).filter(Boolean))),
@@ -70,7 +72,7 @@
 <CompactDialog title={t("TOOLS")} onDismiss={onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm([...hidden].join(","), browser, hints)}>{t("SAVE")}</Button>
+    <Button onclick={() => onConfirm([...hidden].join(","), browser, hints, sketches)}>{t("SAVE")}</Button>
   {/snippet}
   <SwitchRow
     title={t("BROWSER_VIEW")}
@@ -83,6 +85,12 @@
     summary={t("SUGGESTIONS_DESC")}
     checked={hints}
     onChange={(value) => (hints = value)}
+  />
+  <SwitchRow
+    title={t("DRAWINGS")}
+    summary={t("DRAWINGS_DESC")}
+    checked={sketches}
+    onChange={(value) => (sketches = value)}
   />
   <div class="h-2"></div>
   {#if tools.length}

@@ -610,6 +610,8 @@
   "CHANGELOG": "更新履歴",
   "SUGGESTIONS": "次のステップの提案",
   "SUGGESTIONS_DESC": "モデルがターンの最後にボタンを表示します。ボタンからメッセージを送信するか、入力欄に残して続きを書けます",
+  "DRAWINGS": "応答内の図",
+  "DRAWINGS_DESC": "文章より図のほうがわかりやすいとき、モデルが図で応答します。チェックリスト、図表、スケッチなどを描きます",
   "DISCORD_PRESENCE": "Discord のアクティビティ表示",
   "DISCORD_PRESENCE_SUMMARY": "Discord のプロフィールに現在の作業内容を表示します",
   "DISCORD_FIELD_STATUS": "ステータス",

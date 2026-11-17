@@ -384,8 +384,9 @@
     disabled={snapshot.mcpDisabled}
     browserView={snapshot.browserView}
     suggestions={snapshot.suggestions}
-    onConfirm={(mcp_disabled, browser_view, suggestions) =>
-      void apply({ mcp_disabled, browser_view, suggestions })}
+    drawings={snapshot.drawings}
+    onConfirm={(mcp_disabled, browser_view, suggestions, drawings) =>
+      void apply({ mcp_disabled, browser_view, suggestions, drawings })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "agents"}

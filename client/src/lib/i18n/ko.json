@@ -610,6 +610,8 @@
   "CHANGELOG": "변경 내역",
   "SUGGESTIONS": "다음 단계 제안",
   "SUGGESTIONS_DESC": "모델이 턴을 마칠 때 버튼을 표시합니다. 버튼으로 메시지를 바로 보내거나, 입력란에 남겨 두고 직접 마무리할 수 있습니다",
+  "DRAWINGS": "응답 속 그림",
+  "DRAWINGS_DESC": "글보다 그림이 더 잘 설명할 때 모델이 그림으로 응답합니다. 체크리스트, 다이어그램, 스케치 등을 그립니다",
   "DISCORD_PRESENCE": "Discord 활동 상태",
   "DISCORD_PRESENCE_SUMMARY": "Discord 프로필에 현재 하고 있는 작업을 표시합니다",
   "DISCORD_FIELD_STATUS": "상태",

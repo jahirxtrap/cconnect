@@ -1,5 +1,7 @@
 """What each client renders inline, and the wording the model reads about it."""
 
+from services import settings_store
+
 MEDIA = (
     {
         "capability": "media.gallery",
@@ -39,6 +41,7 @@ MEDIA = (
     },
     {
         "capability": "media.drawing",
+        "setting": "drawings",
         "block": "a drawing — the one block written inline: its body is the `<svg>` element itself, not "
         "JSON, with no file. Only when a picture explains better than text: a checklist with ticks, a "
         "diagram, figures or a table by hand. It is a quick draft and the reader is waiting: start "
@@ -59,11 +62,15 @@ def _listed(parts: list[str], conjunction: str = "and") -> str:
     return f"{', '.join(parts[:-1])} {conjunction} {parts[-1]}"
 
 
+def _offered(entry: dict) -> bool:
+    return "setting" not in entry or bool(settings_store.get(entry["setting"]))
+
+
 def _picked(capabilities, key: str, supported: bool) -> list[str]:
     return [
         entry[key]
         for entry in MEDIA
-        if key in entry and (entry["capability"] in capabilities) is supported
+        if key in entry and _offered(entry) and (entry["capability"] in capabilities) is supported
     ]
 
 
