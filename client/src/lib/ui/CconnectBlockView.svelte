@@ -8,6 +8,7 @@
   import InstallCards from "$lib/screens/install/InstallCards.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import AudioCard from "./AudioCard.svelte";
+  import DrawingBlock from "./DrawingBlock.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import PageFrame from "./PageFrame.svelte";
   import ExpandButton from "./ExpandButton.svelte";
@@ -24,7 +25,7 @@
 
   const { data, onOpen, compact = false, onSuggest = null }: Props = $props();
 
-  const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
+  const MEDIA_HEIGHT = $derived(`calc(var(--spacing) * ${compact ? 48 : 96})`);
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
   const ARROW_CLASS = `${ROUND_ARROW_CLASS} pointer-events-auto`;
   const IMAGE_WIDTH = $derived(compact ? "13.333rem" : "23.333rem");
@@ -143,6 +144,8 @@
   <SuggestionChips items={data.items} onSelect={onSuggest} />
 {:else if data.type === "install"}
   <InstallCards items={data.items} />
+{:else if data.type === "drawing"}
+  <DrawingBlock svg={data.svg} size={MEDIA_HEIGHT} />
 {:else if data.type === "pdf"}
   {#if pdfFailed}
     <a
@@ -170,7 +173,7 @@
   {/if}
 {:else}
   <div class="relative w-full select-none">
-    <div class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card {MEDIA_HEIGHT}">
+    <div class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card" style="height: {MEDIA_HEIGHT}">
       <PageFrame
         url={data.url}
         name={fileName(data.url)}

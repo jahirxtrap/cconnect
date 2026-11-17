@@ -6,6 +6,7 @@ export const CLIENT_CAPABILITIES = [
   "media.markdown_audio",
   "media.pdf",
   "media.html",
+  "media.drawing",
   "components",
   "usage",
   "terminal",

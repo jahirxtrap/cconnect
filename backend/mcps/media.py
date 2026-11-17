@@ -37,6 +37,19 @@ MEDIA = (
         "block": "`html` — takes `url` and `title`; the page loads the files of its folder and its "
         "subfolders by relative path, a reference by the name it shows",
     },
+    {
+        "capability": "media.drawing",
+        "block": "a drawing — the one block written inline: its body is the `<svg>` element itself, not "
+        "JSON, with no file. Only when a picture explains better than text: a checklist with ticks, a "
+        "diagram, figures or a table by hand. It is a quick draft and the reader is waiting: start "
+        "drawing at once, with no layout worked out or checked beforehand; rough positions, plain "
+        "lines and lines that cross are fine, and the canvas grows to hold whatever spills past the "
+        "`viewBox`. Make the `viewBox` square (1:1): the chat shows it in a square frame as wide as the "
+        "reply, and it opens full screen. Its size, style and shapes are yours. Name it with a "
+        "`<title>` as its first child: the name heads the preview and the saved image. It shows exactly "
+        "as drawn, so give it its own background; text without a `font-family` takes the app's font. "
+        "`<defs>`, `<use>` and `<marker>` work; no `<style>`, scripts, links, images or outside URLs",
+    },
 )
 
 

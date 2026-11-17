@@ -5,6 +5,7 @@ import Download from "@lucide/svelte/icons/download";
 import ExternalLink from "@lucide/svelte/icons/external-link";
 import Eye from "@lucide/svelte/icons/eye";
 import FolderArchive from "@lucide/svelte/icons/folder-archive";
+import FolderDown from "@lucide/svelte/icons/folder-down";
 import FolderInput from "@lucide/svelte/icons/folder-input";
 import FolderOpen from "@lucide/svelte/icons/folder-open";
 import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
@@ -44,6 +45,7 @@ export const FILE_ACTION_ORDER = [
   "compress",
   "save",
   "saveAs",
+  "saveToShared",
   "share",
   "attach",
   "mention",
@@ -69,6 +71,7 @@ export const FILE_ACTION_LOOK: Record<FileActionId, { label: string; icon: IconS
   compress: { label: "COMPRESS", icon: FolderArchive },
   save: { label: "SAVE", icon: Download },
   saveAs: { label: "SAVE_AS", icon: Save },
+  saveToShared: { label: "SAVE_TO_SHARED", icon: FolderDown },
   share: { label: "SHARE", icon: Share2 },
   attach: { label: "ATTACH_TO_CHAT", icon: Paperclip },
   mention: { label: "MENTION_IN_CHAT", icon: AtSign },

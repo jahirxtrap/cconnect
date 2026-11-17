@@ -2,6 +2,7 @@ import { backend } from "$lib/services/backend.svelte";
 import { dismissTop } from "$lib/app/dismissStack";
 import { advance, landed, pushEntry, replaceEntry, retreat } from "$lib/app/historyLedger";
 import type { PreviewKind } from "$lib/data/previewKind";
+import type { DrawingSource } from "$lib/markdown/drawing";
 import { isTauri } from "$lib/platform";
 import { layout } from "$lib/platform/layout.svelte";
 
@@ -41,6 +42,7 @@ export interface PreviewRequest {
   links?: PreviewLinks | null;
   poster?: string | null;
   gallery?: PreviewRequest[] | null;
+  drawing?: DrawingSource | null;
 }
 
 const WEB_BLOCKED: Route[] = ["/terminal", "/browser", "/project"];

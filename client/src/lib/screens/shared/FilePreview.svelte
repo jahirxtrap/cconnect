@@ -6,6 +6,7 @@
   import type { Snippet } from "svelte";
   import type { PreviewLinks, PreviewRequest } from "$lib/app/navigation.svelte";
   import type { DatabaseFileSource } from "$lib/data/databaseModels";
+  import type { DrawingSource } from "$lib/markdown/drawing";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
   import { wikiLinks } from "$lib/markdown/render";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
@@ -31,6 +32,8 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CodeView from "$lib/ui/CodeView.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import { drawingActions } from "$lib/ui/drawingActions";
+  import DrawingView from "$lib/ui/DrawingView.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
@@ -76,6 +79,7 @@
     gallery?: PreviewRequest[] | null;
     onPick?: ((index: number) => void) | null;
     databaseFile?: DatabaseFileSource | null;
+    drawing?: DrawingSource | null;
   }
 
   interface Shown {
@@ -109,6 +113,7 @@
     gallery = null,
     onPick = null,
     databaseFile = null,
+    drawing = null,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
@@ -154,6 +159,7 @@
   let describing = $state(false);
   let continuing = $state(false);
   let stageHeight = $state(0);
+  let drawn = $state<SVGSVGElement | null>(null);
 
   const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
   const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
@@ -219,7 +225,10 @@
   );
 
   const menuActions = $derived.by(() => {
-    const entries: FileActionEntry[] = [...extraActions, ...fileEntries(FILE_ACTIONS, { url }, filename)];
+    const entries: FileActionEntry[] = [
+      ...extraActions,
+      ...(drawing ? drawingActions(() => drawn, filename, drawing) : fileEntries(FILE_ACTIONS, { url }, filename)),
+    ];
     if (describable) entries.push({ id: "info", run: () => (describing = true) });
     if (attach) entries.push({ id: "attach", run: attach });
     if (mention) entries.push({ id: "mention", run: mention });
@@ -349,7 +358,11 @@
 {/snippet}
 
 {#snippet body()}
-  {#if kind === "image"}
+  {#if kind === "drawing" && drawing}
+    <ZoomPane class="min-h-0 flex-1">
+      <DrawingView svg={drawing.svg()} bind:drawn class="size-full select-none *:size-full" />
+    </ZoomPane>
+  {:else if kind === "image"}
     <ZoomPane class="min-h-0 flex-1">
       <img
         use:imageSrc={{
@@ -493,7 +506,7 @@
       ? 'pdf-screen-root'
       : ''}"
   >
-    <AppTopBar title={t("VIEW")} subtitle={filename} actions={toolbar}>
+    <AppTopBar title={t(kind === "drawing" ? "DRAWING" : "VIEW")} subtitle={filename} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>
           <ArrowLeft />

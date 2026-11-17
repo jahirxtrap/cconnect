@@ -203,6 +203,7 @@
       onDelete={request.onDelete}
       links={request.links}
       gallery={request.gallery}
+      drawing={request.drawing}
       onPick={showGalleryItem}
       onClose={() => navigation.closePreview()}
     />

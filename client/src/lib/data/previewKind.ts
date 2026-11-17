@@ -3,7 +3,7 @@ import { isPackFile } from "$lib/design/packs/schema";
 import { resolveLang } from "$lib/markdown/highlighter";
 import { isArchive } from "./format";
 
-export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio" | "database";
+export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio" | "database" | "drawing";
 
 export type FileKind = "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "database" | "archive" | "pack" | "text";
 
@@ -84,7 +84,7 @@ export const previewKindOf = (filename: string): PreviewKind => {
   return "text";
 };
 
-const RENDERED_KINDS: PreviewKind[] = ["image", "video", "audio", "pdf", "html", "database"];
+const RENDERED_KINDS: PreviewKind[] = ["image", "video", "audio", "pdf", "html", "database", "drawing"];
 
 export const readsAsText = (kind: PreviewKind): boolean => !RENDERED_KINDS.includes(kind);
 

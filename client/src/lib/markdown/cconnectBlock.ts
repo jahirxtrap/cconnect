@@ -3,6 +3,7 @@ import { installFromItem, type InstallRequest } from "$lib/data/installRequest";
 export const CCONNECT_LANG = "cconnect";
 
 const MAX_SUGGESTIONS = 3;
+const DRAWING_START = /^\s*<svg[\s>]/i;
 
 export interface GalleryItem {
   url: string;
@@ -34,7 +35,8 @@ export type CconnectBlock =
   | { type: "pdf"; url: string; title?: string }
   | { type: "html"; url: string; title?: string }
   | { type: "suggestions"; items: SuggestionItem[] }
-  | { type: "install"; items: InstallRequest[] };
+  | { type: "install"; items: InstallRequest[] }
+  | { type: "drawing"; svg: string };
 
 const str = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value : undefined;
@@ -46,6 +48,7 @@ const items = (value: unknown): Record<string, unknown>[] =>
   Array.isArray(value) ? value.filter((item): item is Record<string, unknown> => !!item && typeof item === "object") : [];
 
 export function parseCconnectBlock(source: string): CconnectBlock | null {
+  if (DRAWING_START.test(source)) return { type: "drawing", svg: source };
   let raw: unknown;
   try {
     raw = JSON.parse(source);

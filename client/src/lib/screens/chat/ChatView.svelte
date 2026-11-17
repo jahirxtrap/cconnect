@@ -25,7 +25,7 @@
   import { isPackFile } from "$lib/design/packs/schema";
   import { offerShared } from "$lib/screens/packs/packIntake";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
-  import { provideServer } from "$lib/services/serverContext";
+  import { provideServer, provideSharedFolder } from "$lib/services/serverContext";
   import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -113,6 +113,7 @@
   const OUTSIDE_TURN = ["usage", "session_info", "reload"];
 
   provideServer(() => chat.environment);
+  provideSharedFolder(() => chat.workingProject ?? "");
 
   let confirmCommand = $state<CommandOption | null>(null);
   let rewindOpen = $state(false);

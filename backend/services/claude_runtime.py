@@ -271,10 +271,13 @@ def _result_view(tool_use_id: Any, content: str) -> dict:
 
 
 _FENCE_LINE = re.compile(r"^```", re.MULTILINE)
+_DRAWING_FENCE = re.compile(r"```cconnect[ \t]*\n\s*<svg[\s>]")
 
 
 def _settled_len(text: str) -> int:
     fences = list(_FENCE_LINE.finditer(text))
+    if len(fences) % 2 and _DRAWING_FENCE.match(text, fences[-1].start()):
+        return len(text)
     cut = fences[-1].start() if len(fences) % 2 else len(text)
     link = text.rfind("[", 0, cut)
     if link >= 0 and ")" not in text[link:cut]:
