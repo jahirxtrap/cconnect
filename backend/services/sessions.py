@@ -1988,20 +1988,6 @@ def _normalize(
                         "declined": declined,
                     })
                     continue
-                if name.endswith("show_component") and isinstance(inp, dict):
-                    if isinstance(bid, str):
-                        hidden_ids.add(bid)
-                    if not _ran(bid, tool_result_by_id, tool_errors):
-                        continue
-                    messages.append({
-                        "type": "interaction",
-                        "kind": "component",
-                        "shown": True,
-                        "title": inp.get("title"),
-                        "icon": inp.get("icon"),
-                        "blocks": [b for b in (inp.get("blocks") or []) if isinstance(b, dict)],
-                    })
-                    continue
                 if name.endswith("ask_component") and isinstance(inp, dict):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)

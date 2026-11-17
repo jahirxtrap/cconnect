@@ -1576,7 +1576,7 @@ async def ask_side_question(
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
             "locale": locale,
-        }, exclude=("ask_component", "show_component"))}
+        }, exclude=("ask_component",))}
     tools = scope["tools"]
     if tools is not True:
         options_kwargs["tools"] = tools if isinstance(tools, list) else []

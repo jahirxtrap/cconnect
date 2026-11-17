@@ -174,7 +174,7 @@ format is not a contract; what currently holds:
   `custom-title`, `mode`, `last-prompt`…) by type, never by position.
 - A message from another Claude session is a meta `user` entry with `origin.kind: "peer"`; it is
   read from `origin` (`name`, `body`) live and on resume, never from the text around it.
-- A block a tool emits live when it runs (shared files, a pack export, `show_component`) is rebuilt
+- A block a tool emits live when it runs (shared files, a pack export) is rebuilt
   only when its call answered without an error (`_ran`), so a call a hook refused shows nothing on
   resume either. Tools mark their failures with `reply(..., error=True)`.
 - The SDK writes `"entrypoint":"sdk-py"`, which hides a session from `claude --resume`. Each turn
@@ -295,11 +295,11 @@ subtasks. Simple mode never hides file changes, shared files, query blocks, form
   rest are **deferred behind tool search**. `eager` loads a tool up front (`_meta`
   `anthropic/alwaysLoad`, through mcp 2's handler API). `guide` puts the first paragraph of the
   description in the system prompt (`TOOLS.md`), which is what makes Claude reach for it.
-- `ask_component` and `show_component` share `mcps/components.py`: every value is a string, an
+- `ask_component` lives in `mcps/components.py`: every value is a string, an
   `id` means the element carries a value, labels travel as keys, `show_if` also drops the value,
   validation is client-side. `mcps/media.py` is the one table of what renders inline.
-- **Adding an element** (no generator): `TYPES` + `LEAF` and its line in `DESCRIPTION` /
-  `SHOW_DESCRIPTION`; `ComponentElement` in `client/.../data/chatModels.ts` and `toElement` in
+- **Adding an element** (no generator): `TYPES` + `LEAF` and its line in `DESCRIPTION`;
+  `ComponentElement` in `client/.../data/chatModels.ts` and `toElement` in
   `.../services/chatSocket.ts`; the `{#if}` chain in `ComponentBlock.svelte`; the summary
   (`componentSummary` / `summary`), which must keep `secret` values out of the chat; the
   validation (`componentMissing` / `missing`); `en.json` and the other catalogs.

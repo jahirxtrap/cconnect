@@ -186,18 +186,20 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   bands. A chat that is not the owner drops its look and inherits the owner's palette; each pane
   keeps its environment's accent. On mobile the secondary layer, while up, is the only candidate
   and draws the art itself (`layerArt`); the drawer stays outside the themed root.
-- `GlassBand` covers the chat column (`glass-column`, edges masked by `glass-fade`) with a blurred
-  copy of the window art, aligned to `[data-window-art]`; never a `backdrop-filter`, which mobile
-  GPUs recompute on every scroll frame. A scene's tint is screened over the copy.
+- `VeilBand` covers the chat column (`veil-column`, edges masked by `veil-fade`) with a flat tint
+  (`veilOf`: a scene's own, else `DEFAULT_VEIL`), only while «Soften background»
+  (`background_veil`) is on. No blur and no `backdrop-filter`: either repaints with the art on
+  every frame.
 - Over a backdrop `glassRemapStyle` turns `surface`, `surface-nested` and `surface-variant` into
   `card-bg` and `nested-bg`, and `hover`, `on-surface-variant`, `faint`, `outline` and
   `outline-variant` into their `-glass` versions; a scene's glass `tint` tints the blocks instead
   (`glassStyle`). A block paints its tint once: its head and a `CodeBlock`'s `pre` paint none.
   `derivedColor` is the one reader of a derived rule.
-- Over a backdrop an expanded block's sticky head is opaque: `HeadGlass` paints in it,
-  as `position: fixed` layers clipped to the head, the window art, the band and the block tint,
-  so it looks see-through yet hides what scrolls under it with no work per frame. Nothing above a
-  chat's heads may create a containing block for fixed elements (transform, filter, contain).
+- Over a backdrop an expanded block's sticky head is opaque: `HeadVeil` paints in it a strip at
+  the top of `[data-chat-viewport]` (`position: fixed`, the head's height) holding the window
+  art as a still image (`windowVeil().still`), the band and the block tint, so it looks
+  see-through yet hides what scrolls under it with no work per frame. Nothing above a chat's heads
+  may create a containing block for fixed elements (transform, filter, contain).
 - The quick chat sheet (`SidePanel`) is a surface and a content sheet that slide by the same
   pixel `transform` (composited); the surface runs under the composer and behind the system bar
   (`--composer-height`, a CSS variable since an outroing component's props freeze), the content is
@@ -235,6 +237,10 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   (or `preview.rs`) does not know gets a page that posts `missing` on the `cconnect-frame` channel.
   A forgotten page is opened again; a missing file shows the app's own state. While its server is
   unavailable the frame shows `ServerUnavailable` and reopens when it is back.
+- A served page never adds to the window's history: the frame script (`backend/core/scripts/page_frame.js`)
+  turns its pushes, links and `#` navigations into replacements, since the app's Back closes the
+  view. `historyLedger` keeps the position of each of its own entries, so Back still lands on the
+  previous screen past entries some other frame left.
 - A file linked before it exists waits on its shared folder (`services/sharedArrival.svelte.ts`).
   A loaded image follows its file (`followSharedFile`) and swaps in off screen.
 - Media blocks share `.media-frame` (`ui/mediaFrame.ts`).
@@ -332,7 +338,8 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   composer before touching it.
 - The service worker (`public/sw.js`) caches nothing; it exists so Chrome offers the install.
 - The app shrinks by `--keyboard` while the keyboard is up. The chat background reaches under it and
-  under `--safe-bottom` (`behind-keyboard`, the pair of `above-keyboard`), so its size never changes.
+  under `--safe-bottom` (`behind-keyboard`, the pair of `above-keyboard`), so its size never changes,
+  and under the status bar (`behind-status-bar`).
 
 ## Android
 

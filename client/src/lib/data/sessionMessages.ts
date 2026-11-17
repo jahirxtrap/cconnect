@@ -88,9 +88,8 @@ const parseInteraction = (raw: Wire): InteractionData => {
     for (const [key, value] of Object.entries(raw_values)) {
       values[key] = Array.isArray(value) ? value.map(String).join(VALUE_SEPARATOR) : String(value);
     }
-    const shown = raw.shown === true;
     return {
-      ...emptyInteraction(shown ? "shown" : "resumed", kind),
+      ...emptyInteraction("resumed", kind),
       title: text(raw, "title"),
       titleKey: text(raw, "title_key"),
       icon: text(raw, "icon"),
@@ -101,7 +100,7 @@ const parseInteraction = (raw: Wire): InteractionData => {
       dismissedBy: text(raw, "dismissed_by"),
       blocks: list(raw, "blocks").flatMap(toElement),
       values,
-      submitted: !shown,
+      submitted: true,
       declined: raw.declined === true,
     };
   }

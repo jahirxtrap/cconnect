@@ -676,8 +676,6 @@ export class ChatSocket {
     const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
-    this.#unansweredStarts = 0;
-    this.#abandonedStarts = 0;
     this.#socket?.close();
     this.onEvent(false, null, { type: "connecting", resumed });
     const socket = openSocket(url, true, this.agent());
@@ -693,6 +691,8 @@ export class ChatSocket {
 
     socket.onopen = () => {
       if (generation !== this.#generation) return;
+      this.#unansweredStarts = 0;
+      this.#abandonedStarts = 0;
       this.#redial.reached();
       this.#startHeartbeat();
       this.onEvent(false, null, { type: "open" });

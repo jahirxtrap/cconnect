@@ -58,24 +58,6 @@ Set present to "dialog" to ask in a dialog over the chat rather than inline; eit
 stays in the conversation. Reuse the same block_id to replace a form you already sent instead of
 stacking a new one. Never describe styling: the app owns the look."""
 
-SHOW_DESCRIPTION = """Draw a block in the chat: bars, text and media laid out together. Use it to show a
-state worth seeing rather than describing: progress, a comparison, a small report. For plain prose or
-a single image, write markdown instead.
-
-It asks nothing and returns right away, so keep talking after calling it.
-
-Elements, in the order you list them:
-- text: a markdown paragraph, written in `text`.
-- bar: read-only progress bar for a 0-100 value, with its label and an optional line under it.
-  It turns into the alert colour past alert_above or under alert_below. Its percentage reads on the
-  right unless display is "bare", and leaving label out drops the line above it.
-- preview: {PREVIEW}
-- page: puts its own blocks on a tab, so the user moves between them.
-- group: folds its own blocks into a section, closed until the user opens it or you set open.
-
-Reuse the same block_id to replace a block you already drew instead of stacking a new one.
-Never describe styling: the app owns the look."""
-
 ICONS = [
     "question", "message-square", "check", "x", "plus", "pencil", "trash", "download",
     "external-link", "refresh", "search", "settings", "info", "alert",
@@ -135,10 +117,6 @@ TYPES = [
     "page", "group", "bar", "slider", "color", "path", "file",
 ]
 
-SHOW_TYPES = ["text", "bar", "preview", "page", "group"]
-
-SHOW_FIELDS = {"label", "value", "text", "color", "alert_above", "alert_below", "severity", "display", "open", "block"}
-
 COLORS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
 SEVERITIES = ["normal", "warning", "critical"]
@@ -191,12 +169,11 @@ FIELDS = {
 }
 
 
-def _blocks(types: list[str], fields: set[str] | None = None) -> dict:
-    leaf = {key: spec for key, spec in FIELDS.items() if fields is None or key in fields}
+def _blocks(types: list[str]) -> dict:
     return {
         "leaf": {
             "type": "object",
-            "properties": {"type": {"type": "string", "enum": types}, **leaf},
+            "properties": {"type": {"type": "string", "enum": types}, **FIELDS},
             "required": ["type"],
         },
         "node": {
@@ -224,18 +201,6 @@ def _blocks(types: list[str], fields: set[str] | None = None) -> dict:
 
 BLOCKS = {"type": "array", "items": {"$ref": "#/$defs/element"}, "description": "The elements, in order."}
 
-SHOW_SCHEMA = {
-    "type": "object",
-    "$defs": _blocks(SHOW_TYPES, SHOW_FIELDS),
-    "properties": {
-        "blocks": BLOCKS,
-        "title": {"type": "string", "description": "Heading of the block. Without it there is no heading at all."},
-        "icon": {"type": "string", "enum": ICONS, "description": "Icon next to the title."},
-        "block_id": {"type": "string", "description": "Reuse it to replace an earlier block instead of stacking."},
-    },
-    "required": ["blocks"],
-}
-
 SCHEMA = {
     "type": "object",
     "$defs": _blocks(TYPES),
@@ -260,7 +225,6 @@ SCHEMA = {
 }
 
 ASK_COMPONENT = Definition("ask_component", DESCRIPTION, SCHEMA, guide=True)
-SHOW_COMPONENT = Definition("show_component", SHOW_DESCRIPTION, SHOW_SCHEMA, guide=True)
 
 
 def _walk(blocks: list):
@@ -305,29 +269,10 @@ def _previewed(definition: Definition, preview: str) -> Definition:
 
 def make_tools(context: dict) -> list:
     ask_user = context.get("ask_user")
-    emit = context.get("emit")
     capabilities = context.get("capabilities") or ()
-    if CAPABILITY not in capabilities:
+    if CAPABILITY not in capabilities or ask_user is None:
         return []
     preview = preview_description(capabilities)
-    tools = []
-
-    if emit is not None:
-        @_previewed(SHOW_COMPONENT, preview)
-        async def show(args):
-            await emit({
-                "type": "component",
-                "block_id": args.get("block_id"),
-                "title": args.get("title"),
-                "icon": args.get("icon"),
-                "blocks": args.get("blocks") or [],
-            })
-            return reply("Shown in the chat.")
-
-        tools.append(show)
-
-    if ask_user is None:
-        return tools
 
     @_previewed(ASK_COMPONENT, preview)
     async def ui(args):
@@ -366,5 +311,4 @@ def make_tools(context: dict) -> list:
                 answer["notes"] = notes
         return reply(json.dumps(answer, ensure_ascii=False))
 
-    tools.append(ui)
-    return tools
+    return [ui]
