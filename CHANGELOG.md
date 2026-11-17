@@ -1,10 +1,10 @@
-- Chat background has a new Claude option, picked by default: when a mod gives the chat a theme, the chat takes its colors, its light or dark mode and its scene
-- A background fills the whole chat screen behind panels of glass, messages and code let it through, and Frosted glass blurs it behind the chat
-- With two chats side by side, the window takes the theme of the one you are in, and a chat in the right panel looks like the main one
-- Messages keep to a column in the middle of the chat, and Full-width chat spreads them across the panel
-- CConnect Extras adds Nebula, a new animated background
-- `cconnect update` says which version you have, whether it is already up to date and which version it installs
-- A chat opened while the app was still connecting loads its whole history, files pasted into the quick chat no longer land in the main chat, and restarting or updating the server no longer leaves processes behind that keep its port busy
+- Chat background opens a single dialog: the preview and Soften background always in view, and two tabs, Backgrounds and Adjust, where every change applies at once
+- Soften background replaces Frosted glass: it tints the chat instead of blurring it, one switch for every background, so chats scroll smoothly over any background and the headers of open blocks no longer lag behind
+- The quick chat slides smoothly on phones, follows the keyboard without flickering and reaches under the navigation bar
+- Blocks over a background are less see-through, so what they hold reads better
+- On Windows, a server running in a terminal comes back in that same terminal after Update or `cconnect update`, instead of in the background
+- A chat no longer stays frozen when you come back to the app after a while: new messages show again without opening it from the list
+- On the phone the background reaches under the status bar, Back in the header works on the first tap after zooming an image, a queued message sent while the app was in the background leaves the composer, swiping in a full-screen file no longer opens the side menu, and Nebula is now a still background
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
