@@ -34,6 +34,16 @@ def upgrade_command(distribution: str, kept: list[str] = ()) -> list[str]:
     uv = uv_tool()
     if uv:
         return [uv, "tool", "install", "--upgrade", "--force", distribution, *chain.from_iterable(("--with", item) for item in kept)]
+    return _pip_upgrade(distribution)
+
+
+def in_place_upgrade_command(distribution: str) -> list[str]:
+    """Upgrades along the install's own record, so uv never rebuilds an environment that is running."""
+    uv = uv_tool()
+    return [uv, "tool", "upgrade", distribution] if uv else _pip_upgrade(distribution)
+
+
+def _pip_upgrade(distribution: str) -> list[str]:
     return [sys.executable, "-m", "pip", "install", "--upgrade", distribution]
 
 

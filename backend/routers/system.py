@@ -5,7 +5,7 @@ import os
 
 from fastapi import APIRouter, Header, Query, WebSocket, WebSocketDisconnect
 
-from core import paths, process_tree, self_update
+from core import paths, process_tree
 from core.access import key_matches
 from core.config import RESTART_EXIT_CODE
 from core.responses import api_response
@@ -39,7 +39,7 @@ def _exit_after(code: int) -> None:
     async def _later():
         await asyncio.sleep(_EXIT_DELAY)
         await live_sessions.close_processes()
-        await asyncio.to_thread(process_tree.terminate_descendants, self_update.spared())
+        await asyncio.to_thread(process_tree.terminate_descendants)
         flag = paths.RESTART_FLAG if code == RESTART_EXIT_CODE else paths.STOP_FLAG
         flag.touch()
         os._exit(code)
@@ -73,7 +73,7 @@ async def check_update():
 async def update_server():
     result = await asyncio.to_thread(repo.pull)
     if result.get("handover"):
-        _exit_after(0)
+        _exit_after(RESTART_EXIT_CODE)
     return api_response(data=result)
 
 

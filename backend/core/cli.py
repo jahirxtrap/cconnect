@@ -26,7 +26,7 @@ import qrcode
 from dotenv import set_key
 
 from core import cli_manager, detached, paths, process_tree, release, sdk, self_update
-from core.config import PORT, RESTART_EXIT_CODE, SERVE_VAR, SUPERVISOR_VAR
+from core.config import PORT, RESTART_EXIT_CODE, SUPERVISOR_VAR
 from services import agent_registry, repo, system_monitor
 
 _ENV_PATH = paths.ENV_FILE
@@ -332,22 +332,13 @@ def _expose(
     _print_qr(json.dumps(payload, separators=(",", ":")))
 
 
-def _serve_args(args: argparse.Namespace, port: int) -> list[str]:
-    return [
-        *(["expose", args.expose] if args.expose else ["run"]),
-        "--port", str(port),
-        *(["--public-host", args.public_host] if args.public_host else []),
-    ]
-
-
-def _spawn_detached(serve: list[str]) -> int:
+def _spawn_detached() -> int:
     handle = paths.DETACHED_LOG_FILE.open("ab")
     kwargs: dict = {
         "stdin": subprocess.DEVNULL,
         "stdout": handle,
         "stderr": handle,
         "cwd": str(paths.BACKEND_DIR),
-        "env": {**os.environ, SERVE_VAR: json.dumps(serve)},
         "close_fds": True,
     }
     if sys.platform == "win32":
@@ -637,20 +628,30 @@ def _stop_running(live: dict[str, str]) -> None:
         supervisor.wait()
 
 
-def _update_after_exit(command: list[str]) -> None:
-    live = detached.runtime()
-    restart = self_update.restart_command()
-    self_update.hand_over(command, restart)
-    if live:
-        _stop_running(live)
-    print(f"The update runs once this command exits. Log: {paths.UPDATE_LOG_FILE}")
-    if restart:
-        print("The backend starts again in the background when it finishes.")
+def _upgrade_here() -> None:
+    print("\n  Updating CConnect...", flush=True)
+    result = repo.upgrade_in_place()
+    paths.UPDATE_LOG_FILE.write_text(result["message"], encoding="utf-8")
+    paths.UPGRADE_FLAG.unlink(missing_ok=True)
+    if not result["ok"]:
+        print(f"  The update failed. Log: {paths.UPDATE_LOG_FILE}", flush=True)
+    elif result["changed"]:
+        print(f"  Updated to {result['version']}. Starting the backend again.\n", flush=True)
+    else:
+        print(f"  CConnect is up to date ({result['version']}).\n", flush=True)
+
+
+def _update_through(live: dict[str, str], supervisor: psutil.Process) -> None:
+    self_update.request(supervisor.pid)
+    paths.RESTART_FLAG.touch()
+    print(f"The backend (pid {live['PID']}) stops, updates and starts again where it runs.")
+    while self_update.upgrading():
+        time.sleep(_POLL_SECONDS)
 
 
 def _refuse_during_update() -> None:
-    if self_update.pending():
-        _abort(f"CConnect is being updated. The backend starts again by itself when it finishes. Log: {paths.UPDATE_LOG_FILE}")
+    if self_update.upgrading():
+        _abort("CConnect is being updated by the running backend, which starts again when it finishes.")
 
 
 def _update(plan: bool) -> None:
@@ -670,16 +671,21 @@ def _update(plan: bool) -> None:
         print(f"CConnect is up to date ({release.VERSION})")
         return
     print(f"Updating to {latest}...")
-    if self_update.needed():
-        _update_after_exit(command)
+    live = detached.runtime()
+    supervisor = _supervisor(live) if live and self_update.needed() else None
+    if supervisor is not None:
+        _update_through(live, supervisor)
+        if repo.on_disk() != latest:
+            _abort(f"the update failed. Log: {paths.UPDATE_LOG_FILE}")
+        print(f"CConnect updated to {latest}")
         return
-    result = repo.upgrade()
+    result = repo.upgrade_in_place() if self_update.needed() else repo.upgrade()
     if not result["ok"]:
         if result["message"]:
             print(result["message"])
-        _abort(f"the update failed. Stop the server and try again: {_invocation()} stop")
+        _abort("the update failed.")
     print(f"CConnect updated to {latest}")
-    if detached.runtime():
+    if live:
         print("The backend that is running keeps the old version until it restarts.")
 
 
@@ -733,7 +739,7 @@ def main():
             paths.DETACHED_PROVIDER_FILE.write_text(args.expose, encoding="utf-8")
         else:
             _print_security_key(key_generated)
-        pid = _spawn_detached(_serve_args(args, port))
+        pid = _spawn_detached()
         _await_start(pid, port)
         print(
             f"  Detached   : pid {pid}"
@@ -760,9 +766,8 @@ def main():
 
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)
+    paths.UPGRADE_FLAG.unlink(missing_ok=True)
     os.environ[SUPERVISOR_VAR] = str(os.getpid())
-    handed = os.environ.pop(SERVE_VAR, None)
-    detached.record_serve(os.getpid(), json.loads(handed) if handed else _serve_args(args, port))
     lifeline = _watch_lifeline() if os.environ.pop(_LIFELINE_VAR, None) else None
     process_tree.adopt_orphans()
     while True:
@@ -785,20 +790,19 @@ def main():
         except KeyboardInterrupt:
             _terminate_tree(process.pid)
             break
-        process_tree.terminate_descendants(self_update.spared())
+        process_tree.terminate_descendants()
         if stopped or paths.STOP_FLAG.exists():
             paths.STOP_FLAG.unlink(missing_ok=True)
             break
+        if paths.UPGRADE_FLAG.exists():
+            _upgrade_here()
         if asked or paths.RESTART_FLAG.exists():
             paths.RESTART_FLAG.unlink(missing_ok=True)
             continue
         if process.returncode != RESTART_EXIT_CODE:
             break
-    process_tree.terminate_descendants(self_update.spared())
-    paths.SERVE_FILE.unlink(missing_ok=True)
+    process_tree.terminate_descendants()
     _end_lifeline(lifeline)
-    if self_update.pending():
-        print(f"\n  CConnect is updating. The backend starts again in the background when it finishes. Log: {paths.UPDATE_LOG_FILE}\n")
 
 
 if __name__ == "__main__":

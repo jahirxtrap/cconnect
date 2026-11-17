@@ -1,5 +1,6 @@
 """How this backend updates itself: from the git checkout it runs from, or from PyPI."""
 
+import importlib
 import subprocess
 from importlib.metadata import PackageNotFoundError, version as installed_version
 from typing import Optional
@@ -12,6 +13,7 @@ from core import packages, paths, release, self_update
 from services import database_engines, databases, git
 
 _TIMEOUT = 120
+_UPGRADE_TIMEOUT = 1800
 _RELEASE_TIMEOUT = 10
 _RELEASE_URL = "https://pypi.org/pypi/cconnect/json"
 
@@ -48,27 +50,51 @@ def upgrade_command() -> list[str]:
     return packages.upgrade_command(DISTRIBUTION, _kept_packages())
 
 
-def _on_disk() -> str:
+def on_disk() -> str:
     """The version installed in the environment right now."""
+    importlib.invalidate_caches()
     try:
         return installed_version(DISTRIBUTION)
     except PackageNotFoundError:
         return release.VERSION
 
 
-def _upgrade_after_stop() -> dict:
-    self_update.hand_over(upgrade_command(), self_update.restart_command())
+def upgrade_in_place() -> dict:
+    """Upgrades the install under its running python and puts back the database drivers uv prunes."""
+    kept = _kept_packages()
+    before = on_disk()
+    try:
+        result = packages.run(packages.in_place_upgrade_command(DISTRIBUTION), _UPGRADE_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {**_package_status(), "ok": False, "message": str(exc), "changed": False, "version": before}
+    output = (result.stdout + result.stderr).strip()
+    try:
+        database_engines.install_packages(kept)
+    except database_engines.EngineError as exc:
+        output = f"{output}\n{exc}".strip()
+    after = on_disk()
+    return {
+        **_package_status(),
+        "ok": (result.returncode == 0 or after != before) and set(kept) <= set(_kept_packages()),
+        "message": output,
+        "changed": after != before,
+        "version": after,
+    }
+
+
+def _upgrade_by_supervisor() -> dict:
+    self_update.request()
     return {**_package_status(), "ok": True, "message": "", "changed": False, "handover": True}
 
 
 def upgrade() -> dict:
     if self_update.needed():
-        return _upgrade_after_stop()
+        return _upgrade_by_supervisor()
     try:
         result = packages.run(upgrade_command(), _TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return {**_package_status(), "ok": False, "message": str(exc), "changed": False}
-    changed = _on_disk() != release.VERSION
+    changed = on_disk() != release.VERSION
     return {
         **_package_status(),
         "ok": result.returncode == 0 or changed,

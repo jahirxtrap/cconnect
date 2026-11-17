@@ -4,7 +4,6 @@ import ctypes
 import os
 import sys
 from contextlib import suppress
-from typing import Iterable
 
 import psutil
 
@@ -40,11 +39,10 @@ def terminate(pid: int, timeout: float) -> None:
     _stop(members(pid), timeout)
 
 
-def terminate_descendants(spared: Iterable[int] = (), timeout: float = _TIMEOUT) -> None:
-    """Stops every process below this one, except ``spared`` and what they started."""
-    kept = {target.pid for pid in spared for target in members(pid)}
+def terminate_descendants(timeout: float = _TIMEOUT) -> None:
+    """Stops every process below this one."""
     with suppress(psutil.Error, OSError):
-        _stop([target for target in psutil.Process().children(recursive=True) if target.pid not in kept and _reapable(target)], timeout)
+        _stop([target for target in psutil.Process().children(recursive=True) if _reapable(target)], timeout)
 
 
 def adopt_orphans() -> None:

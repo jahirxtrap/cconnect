@@ -22,16 +22,15 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
   The runtime record names the supervisor (`SUPERVISOR`). `--detach` over a running server stops
   it with the stop flag and waits for that supervisor to exit, whose `atexit` drops the funnel,
   before exposing again; it reports success once the recorded server itself listens on the port.
-  On Windows an installed release never upgrades while anything runs from its environment: uv
-  cannot replace the `cconnect.exe` launcher in use, and then leaves its receipt (and the drivers
-  in it) behind. `core/self_update` hands the upgrade to a detached PowerShell that waits until
-  nothing runs from `sys.prefix`, then starts the backend again in the background with the
-  arguments its supervisor recorded (`SERVE_FILE`, `detached.serve_args`), whatever way it was
-  started: a terminal, `--detach` or the desktop app. While that PowerShell lives
-  (`UPDATING_FLAG` holds its pid, `self_update.pending`) no backend starts. The desktop app
-  updates its own server by stopping it and running the command `cconnect update --plan` prints.
-  The upgrade runs `uv tool install --upgrade --force`: without `--force`, a launcher uv could not
-  delete makes it remove the whole environment. A lifeline server cancels its watcher's pipe read
+  On Windows the supervisor updates the install itself and starts the server again where it runs
+  (terminal, `--detach` or the desktop app): the route and `cconnect update` leave `UPGRADE_FLAG`
+  with its pid and restart the server, and the supervisor runs `repo.upgrade_in_place`. That is
+  `uv tool upgrade`, which follows the receipt and so never rebuilds an environment in use (a
+  `--with` set that differs from the receipt does, and fails), then puts back the database drivers
+  it pruned; its only failure is copying the launcher in use, which needs no update. The desktop
+  app updates its own server by stopping it and running the command `cconnect update --plan`
+  prints, with `--force` so uv never removes an environment whose launcher it could not delete.
+  A lifeline server cancels its watcher's pipe read
   before it exits (`_end_lifeline`), or Windows ends the interpreter with an access violation.
 - `core/` — `paths` (**the** path table; `INSTALLED` picks the data folder), `release`,
   `config`, `db` / `models` / `migrations/`, `settings_defs` / `settings_store`, `responses`
@@ -229,9 +228,8 @@ left the prompt to arrive as a `tail` and the sender saw it twice.
   chat's form by `elicitation`) and the mods' `ui_*`. `serve` wraps a persistent CLI's query and
   `Answering` a one-shot's transport.
 - Stopping the server closes the CLIs and agents first (`live_sessions.close_processes`), then
-  kills whatever still runs below it (`process_tree.terminate_descendants`), sparing only the
-  Windows update shell (`self_update.spared`): a CLI busy with a background task outlived a
-  restart and kept the port. On Linux the supervisor is the subreaper of its tree
+  kills whatever still runs below it (`process_tree.terminate_descendants`): a CLI busy with a
+  background task outlived a restart and kept the port. On Linux the supervisor is the subreaper of its tree
   (`adopt_orphans`), so what escaped with `setsid` or `nohup`, or survived a crash of the server,
   comes back to it and dies when the server ends; `reap_adopted` collects the ones that exit first.
 

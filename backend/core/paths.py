@@ -54,8 +54,7 @@ RESTART_FLAG = STATE_DIR / ".restart"
 STOP_FLAG = STATE_DIR / ".stop"
 DETACHED_PID_FILE = STATE_DIR / ".detached.pid"
 DETACHED_PROVIDER_FILE = STATE_DIR / ".detached.provider"
-SERVE_FILE = STATE_DIR / ".serve"
-UPDATING_FLAG = STATE_DIR / ".updating"
+UPGRADE_FLAG = STATE_DIR / ".upgrade"
 AI_WORKDIR = Path(os.environ.get("AI_WORKDIR") or STATE_DIR / "internal_task")
 
 NETWORK_STATE_FILE = CACHE_DIR / "network_state.json"
