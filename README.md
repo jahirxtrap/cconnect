@@ -87,7 +87,7 @@ with the tailnet mode or a public one.
   ACP agents open in either panel, and the tabs come back when you reopen the app.
 - **Queue.** Send while Claude is still working: messages are held, run in order and survive a reload.
 - **Questions as forms.** Claude asks with choices, fields and toggles, and answers with galleries,
-  audio, PDFs and live previews.
+  audio, PDFs, live previews and drawings.
 - **Attachments.** Files and photos land on the PC before the prompt runs, and images reach Claude
   as real vision input.
 - **Rewind and fork.** Take a conversation back to any point, with a preview of what changes on
