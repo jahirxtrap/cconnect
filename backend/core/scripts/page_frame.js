@@ -14,6 +14,24 @@
       .filter(Boolean)
       .join('+');
   const tell = (message) => parent.postMessage({ [CHANNEL]: message }, '*');
+  const replacing = (event) => {
+    const link = event.target instanceof Element && event.target.closest('a[href]');
+    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    if ((link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+    if (new URL(link.href, location.href).origin !== location.origin) return;
+    event.preventDefault();
+    location.replace(link.href);
+  };
+  history.pushState = history.replaceState.bind(history);
+  if (window.navigation) {
+    navigation.addEventListener('navigate', (event) => {
+      if (event.navigationType !== 'push' || !event.cancelable || event.formData || event.downloadRequest !== null) return;
+      event.preventDefault();
+      navigation.navigate(event.destination.url, { history: 'replace' });
+    });
+  } else {
+    addEventListener('click', replacing);
+  }
   tell({ shown: true });
   addEventListener('message', (event) => {
     const message = event.source === parent && event.data && event.data[CHANNEL];

@@ -83,7 +83,7 @@ def page(page_id: str) -> Optional[Page]:
 
 
 def framed(html: bytes) -> bytes:
-    """The page with the script that keeps pinch and Ctrl+wheel off the app and takes the app's zoom and keys."""
+    """The page with the script that keeps its pinch and history off the app and takes its zoom and keys."""
     anchor = next((match for match in (pattern.search(html) for pattern in ANCHORS) if match), None)
     at = anchor.end() if anchor else 0
     return html[:at] + FRAME_SCRIPT + html[at:]
