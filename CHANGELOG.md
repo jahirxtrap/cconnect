@@ -1,10 +1,7 @@
-- Chat background opens a single dialog: the preview and Soften background always in view, and two tabs, Backgrounds and Adjust, where every change applies at once
-- Soften background replaces Frosted glass: it tints the chat instead of blurring it, one switch for every background, so chats scroll smoothly over any background and the headers of open blocks no longer lag behind
-- The quick chat slides smoothly on phones, follows the keyboard without flickering and reaches under the navigation bar
-- Blocks over a background are less see-through, so what they hold reads better
-- On Windows, a server running in a terminal comes back in that same terminal after Update or `cconnect update`, instead of in the background
-- A chat no longer stays frozen when you come back to the app after a while: new messages show again without opening it from the list
-- On the phone the background reaches under the status bar, Back in the header works on the first tap after zooming an image, a queued message sent while the app was in the background leaves the composer, swiping in a full-screen file no longer opens the side menu, and Nebula is now a still background
+- Claude can answer with a drawing once you turn on Drawings in replies in Tools: a checklist, a diagram or a sketch that grows in the reply as it writes and opens large like an image, with Save, Share and Save to Shared
+- An HTML page you browse inside, through its tabs or links, closes with Back on the first tap, also after opening something from its menu
+- A message stopped by a hook ends the turn instead of leaving the chat working until you interrupt it
+- Chats use the full width by default, a phone connecting over Wi-Fi or Tailscale shows its name while it connects, and check_progress starts turned off in Tools
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
