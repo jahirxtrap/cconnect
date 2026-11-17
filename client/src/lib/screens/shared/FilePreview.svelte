@@ -48,6 +48,7 @@
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import MediaPlayer from "$lib/ui/MediaPlayer.svelte";
   import AudioStage from "$lib/ui/AudioStage.svelte";
+  import { OWN_SWIPE } from "$lib/ui/swipe";
   import FileInfoDialog from "./FileInfoDialog.svelte";
   import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
   import GalleryStrip from "./GalleryStrip.svelte";
@@ -486,6 +487,7 @@
   </div>
 {:else}
   <div
+    {...OWN_SWIPE}
     class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {androidPdf &&
     kind === 'pdf'
       ? 'pdf-screen-root'

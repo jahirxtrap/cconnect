@@ -2815,6 +2815,7 @@ export class ChatState {
         this.#upsertTodo(event.id, event.content, event.status);
         break;
       case "queued":
+        if (event.id) this.#unacked.delete(event.id);
         if (!event.replay && event.id && !this.#sent.has(event.id) && !this.queue.some((item) => item.id === event.id)) {
           this.#sent.add(event.id);
           this.queue = [...this.queue, { id: event.id, text: event.text, attachments: [], uploading: false }];

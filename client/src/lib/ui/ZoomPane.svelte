@@ -50,6 +50,16 @@
     if (!active) reset();
   });
 
+  $effect(() => {
+    const node = host;
+    if (!node) return;
+    const own = (event: TouchEvent) => {
+      if (scale > minScale || points.size >= 2) event.preventDefault();
+    };
+    node.addEventListener("touchmove", own, { passive: false });
+    return () => node.removeEventListener("touchmove", own);
+  });
+
   const spread = () => {
     const [first, second] = [...points.values()];
     return first && second ? Math.hypot(first.x - second.x, first.y - second.y) : 0;

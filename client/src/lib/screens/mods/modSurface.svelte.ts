@@ -125,7 +125,6 @@ export class ModSurface {
   #redraw = new Set<string>();
   #pressing = new Map<string, number>();
   #landing = new Map<string, (() => void)[]>();
-  #onDrawn: (() => void)[] = [];
   #images = new Map<string, Promise<string | null>>();
   #urls = new Set<string>();
   #rid = 0;
@@ -330,12 +329,10 @@ export class ModSurface {
     this.#owed.delete(key);
     this.#land(key);
     if (this.#redraw.delete(key)) this.#request(key);
-    if (!this.#owed.size) for (const resolve of this.#onDrawn.splice(0)) resolve();
   }
 
   whenDrawn(): Promise<void> {
-    if (!this.#owed.size) return Promise.resolve();
-    return new Promise((resolve) => this.#onDrawn.push(resolve));
+    return Promise.all([...this.#owed].map((key) => this.#nextLanding(key))).then(() => undefined);
   }
 
   focus(component: ModComponent, instanceId: string, plugin: string, key: string) {
@@ -398,7 +395,6 @@ export class ModSurface {
     this.#owed.clear();
     this.#redraw.clear();
     for (const key of [...this.#landing.keys()]) this.#land(key);
-    this.#onDrawn = [];
     this.#stale = true;
   }
 
@@ -436,6 +432,10 @@ export class ModSurface {
   #landed(key: string): Promise<void> {
     if (!this.#owed.has(key)) this.#draw(key);
     if (!this.#owed.has(key)) return Promise.resolve();
+    return this.#nextLanding(key);
+  }
+
+  #nextLanding(key: string): Promise<void> {
     return new Promise((resolve) => this.#landing.set(key, [...(this.#landing.get(key) ?? []), resolve]));
   }
 

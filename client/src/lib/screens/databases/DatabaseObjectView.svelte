@@ -50,6 +50,7 @@
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { OWN_SWIPE } from "$lib/ui/swipe";
   import DataGrid from "./DataGrid.svelte";
   import GridBar from "./GridBar.svelte";
   import RowDialog from "./RowDialog.svelte";
@@ -409,7 +410,10 @@
     {@render content()}
   </div>
 {:else}
-  <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {FULL_INSET_CLASS}">
+  <div
+    {...OWN_SWIPE}
+    class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {FULL_INSET_CLASS}"
+  >
     <AppTopBar title={entry?.name ?? t("DATABASES")} subtitle={title} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>

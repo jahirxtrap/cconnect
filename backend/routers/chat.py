@@ -9,6 +9,7 @@ still-pending permission prompt re-emitted.
 
 import asyncio
 import json
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from loguru import logger
@@ -351,20 +352,26 @@ async def _run_usage(send, account: str | None = None, capabilities=None, locale
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
 
 
+def _mod_tree(rid, component, instance_id, session, drawn: Optional[dict] = None) -> dict:
+    return {
+        "type": "mod_tree",
+        "rid": rid,
+        "component": component,
+        "instance_id": instance_id,
+        **(drawn or {"tree": None, "props": None, "hooked": False, "client_modules": {}}),
+        "channel": session.channel if session is not None else None,
+    }
+
+
 async def _send_mod_tree(send, session, msg: ModRenderMessage):
-    """Draw one mod component for the socket that asked."""
+    """Draw one mod component for the socket that asked, with a null tree when nothing draws it."""
+    drawn = None
     try:
-        drawn = await session.mod_render(msg.component, msg.instance_id, msg.props, msg.columns, msg.rows, msg.offset)
-        await send({
-            "type": "mod_tree",
-            "rid": msg.rid,
-            "component": msg.component,
-            "instance_id": msg.instance_id,
-            **(drawn or {"tree": None, "props": None, "hooked": False, "client_modules": {}}),
-            "channel": session.channel,
-        })
+        if session is not None:
+            drawn = await session.mod_render(msg.component, msg.instance_id, msg.props, msg.columns, msg.rows, msg.offset)
     except Exception as exc:
         logger.debug(f"mod render ended: {type(exc).__name__}: {exc}")
+    await send(_mod_tree(msg.rid, msg.component, msg.instance_id, session, drawn))
 
 
 async def _send_mod_reply(send, session, rid: int, work):
@@ -431,8 +438,8 @@ async def chat_ws(ws: WebSocket):
                 msg = ChatMessage.validate_python(raw)
             except ValidationError as exc:
                 await send(_rejected(raw, _invalid(exc)))
-                if isinstance(raw, dict) and raw.get("type") == "mod_render" and session is not None:
-                    await send({"type": "mod_tree", "rid": raw.get("rid"), "tree": None, "channel": session.channel})
+                if isinstance(raw, dict) and raw.get("type") == "mod_render":
+                    await send(_mod_tree(raw.get("rid"), raw.get("component"), raw.get("instance_id"), session))
                 continue
             mtype = msg.type
 
@@ -597,8 +604,7 @@ async def chat_ws(ws: WebSocket):
                     await session.release_resident("closed from the app")
 
             elif mtype == "mod_render":
-                if session is not None:
-                    spawn(_send_mod_tree(send, session, msg))
+                spawn(_send_mod_tree(send, session, msg))
 
             elif mtype == "mod_act":
                 if session is not None:
