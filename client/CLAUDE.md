@@ -186,21 +186,23 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   bands. A chat that is not the owner drops its look and inherits the owner's palette; each pane
   keeps its environment's accent. On mobile the secondary layer, while up, is the only candidate
   and draws the art itself (`layerArt`); the drawer stays outside the themed root.
-- `GlassBand` covers the chat column (`glass-column`, edges masked by `glass-fade`). No ancestor
-  of a blur layer carries a mask and nothing uses `mix-blend-mode`: either makes Chromium's blur
-  sample nothing. A tint is screened inside an SVG filter used as `backdrop-filter: url(#…)`.
+- `GlassBand` covers the chat column (`glass-column`, edges masked by `glass-fade`) with a blurred
+  copy of the window art, aligned to `[data-window-art]`; never a `backdrop-filter`, which mobile
+  GPUs recompute on every scroll frame. A scene's tint is screened over the copy.
 - Over a backdrop `glassRemapStyle` turns `surface`, `surface-nested` and `surface-variant` into
   `card-bg` and `nested-bg`, and `hover`, `on-surface-variant`, `faint`, `outline` and
   `outline-variant` into their `-glass` versions; a scene's glass `tint` tints the blocks instead
-  (`glassStyle`). Translucent tints add up, so every part of a block paints the block's own tint:
-  a collapsible's head and body, a `CodeBlock`'s header and code (inside markdown its `pre`
-  overrides the `.markdown pre` background). `derivedColor` is the one reader of a derived rule.
-- A sticky collapsible head hides what passes under it with the scroll-driven
-  `cover-under-head` clip over the block's `exit-crossing` range.
-- The quick chat sheet (`SidePanel`) moves as one piece: its surface runs under the composer
-  through `--composer-height` (a CSS variable: an outroing component's props freeze), the sheet
-  translates by `--sheet-under` × (its height + the composer's), and its content is clipped at
-  the body's bottom edge. `onAttach` is null while it is open.
+  (`glassStyle`). A block paints its tint once: its head and a `CodeBlock`'s `pre` paint none.
+  `derivedColor` is the one reader of a derived rule.
+- Over a backdrop an expanded block's sticky head is opaque: `HeadGlass` paints in it,
+  as `position: fixed` layers clipped to the head, the window art, the band and the block tint,
+  so it looks see-through yet hides what scrolls under it with no work per frame. Nothing above a
+  chat's heads may create a containing block for fixed elements (transform, filter, contain).
+- The quick chat sheet (`SidePanel`) is a surface and a content sheet that slide by the same
+  pixel `transform` (composited); the surface runs under the composer and behind the system bar
+  (`--composer-height`, a CSS variable since an outroing component's props freeze), the content is
+  clipped by a body-sized box, and on mobile the surface is only the panel tint over the band.
+  `onAttach` is null while it is open.
 
 ## Browser (`screens/browser/`)
 

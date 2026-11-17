@@ -25,9 +25,10 @@
   import { chatBackground } from "$lib/data/chatBackground.svelte";
   import { MOD_BACKGROUND } from "$lib/design/backgrounds";
   import ModBackdrop from "$lib/screens/mods/ModBackdrop.svelte";
-  import { backdropOf, glassOf, lookCssOf, windowBackdrop } from "./backdrop.svelte";
+  import { backdropOf, lookCssOf, veilOf, windowBackdrop } from "./backdrop.svelte";
   import ChatBackdrop from "./ChatBackdrop.svelte";
-  import GlassBand from "./GlassBand.svelte";
+  import VeilBand from "./VeilBand.svelte";
+  import { provideWindowVeil } from "./windowVeil";
   import { paneCardClass } from "./paneChrome";
   import PaneContent from "./PaneContent.svelte";
   import PanelPreview, { previewFills } from "./PanelPreview.svelte";
@@ -239,6 +240,9 @@
         : panes.chatAt("center"),
   );
   const rightChat = $derived(rightShown && !layout.mobile && !previewFills("right") ? panes.chatAt("right") : null);
+  const paneShift = settling(() => rightShown);
+  const holeShift = settling(() => `${centerChat !== null}|${rightChat !== null}`);
+  const holeInstant = $derived(holeShift.active && !paneShift.active);
   const layerChat = $derived(paneLayer && !previewFills("right") ? panes.chatAt("right") : null);
   const paneChats = $derived(
     paneLayer
@@ -253,13 +257,19 @@
   const owner = $derived(paneChats.find((chat) => draws(chat) && !!chat.mods.look) ?? paneChats.find(draws) ?? null);
   const backdropShown = $derived(owner !== null);
   const layerArt = $derived(paneLayer && backdropShown);
-  const glass = $derived(owner ? glassOf(owner.mods.look, modBackground, chatBackground.effects) : null);
+  const veil = $derived(owner ? veilOf(owner.mods.look, modBackground) : null);
   const paletteChat = $derived(owner ?? paneChats.find((chat) => chat !== null) ?? null);
   const lookCss = $derived(lookCssOf(paletteChat?.mods.look ?? null, modBackground, backdropShown));
 
   $effect(() => {
     windowBackdrop.shown = backdropShown;
     windowBackdrop.owner = owner;
+  });
+
+  provideWindowVeil({
+    veil: () => veil,
+    column: () => !settings.chatFullWidth,
+    still: stillArt,
   });
 
   $effect(() =>
@@ -338,6 +348,8 @@
 
 {#if paneKept}
   <div
+    data-art-host
+    data-veil-card
     class="safe-area fixed inset-x-0 top-0 z-40 {layerArt ? 'over-backdrop' : 'bg-background'} {paneLayer
       ? ''
       : 'invisible'}"
@@ -354,6 +366,7 @@
 
 <div
   bind:this={frame}
+  data-art-host
   bind:clientWidth={frameWidth}
   bind:clientHeight={frameHeight}
   class="relative isolate flex h-full {backdropShown ? 'over-backdrop' : layout.mobile ? '' : 'bg-surface'}"
@@ -363,7 +376,7 @@
     {@render windowArt(owner)}
     {#if !layout.mobile}
       <svg aria-hidden="true" class="behind-keyboard pointer-events-none absolute inset-0 -z-10 h-full w-full">
-        <path class="gutter-veil {still ? 'gutter-veil-still' : ''}" fill-rule="evenodd" style="d: path('{holePath}')" />
+        <path class="gutter-veil {still || holeInstant ? 'gutter-veil-still' : ''}" fill-rule="evenodd" style="d: path('{holePath}')" />
       </svg>
     {/if}
   {/if}
@@ -392,6 +405,7 @@
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
+    data-veil-card
     class="relative flex min-w-0 flex-1 flex-col {layout.mobile
       ? ''
       : `my-(--pane-gap) ${paneCardClass(backdropShown, centerChat !== null)}`}"
@@ -491,7 +505,7 @@
             onDragging: pinWidths,
           }}
         ></div>
-        <div class="relative flex min-w-0 flex-1 flex-col {paneCardClass(backdropShown, rightChat !== null)}">
+        <div data-veil-card class="relative flex min-w-0 flex-1 flex-col {paneCardClass(backdropShown, rightChat !== null)}">
           {#if rightChat}
             {@render chatBand()}
           {/if}
@@ -531,17 +545,29 @@
 {/snippet}
 
 {#snippet windowArt(chat: ChatState)}
+  <div data-window-art aria-hidden="true" class="behind-status-bar behind-keyboard pointer-events-none absolute inset-0 -z-10">
+    {@render art(chat, false)}
+  </div>
+{/snippet}
+
+{#snippet art(chat: ChatState, still: boolean)}
   {#if modBackground}
-    <ModBackdrop mods={chat.mods} effects={chatBackground.effects} class="behind-keyboard -z-10" />
+    <ModBackdrop mods={chat.mods} effects={chatBackground.effects} {still} />
   {:else}
-    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} class="behind-keyboard -z-10" />
+    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} {still} />
+  {/if}
+{/snippet}
+
+{#snippet stillArt()}
+  {#if owner}
+    {@render art(owner, true)}
   {/if}
 {/snippet}
 
 {#snippet chatBand()}
-  {#if glass}
-    <div aria-hidden="true" class="behind-keyboard pointer-events-none absolute inset-0 -z-10">
-      <GlassBand blur={glass.blur} tint={glass.tint} opacity={glass.opacity} screen={modBackground} column={!settings.chatFullWidth} />
+  {#if veil}
+    <div data-veil-band aria-hidden="true" class="behind-status-bar behind-keyboard pointer-events-none absolute inset-0 -z-10">
+      <VeilBand tint={veil.tint} opacity={veil.opacity} column={!settings.chatFullWidth} />
     </div>
   {/if}
 {/snippet}

@@ -14,7 +14,7 @@ import { packFile, packImageKey } from "$lib/design/packs/storage";
 import { blobStore } from "$lib/platform/blobStore";
 import { store } from "$lib/platform/storage";
 import { imageCache } from "$lib/services/imageCache.svelte";
-import { scaledImage } from "$lib/services/imageSize";
+import { isVector, scaledImage } from "$lib/services/imageSize";
 import { guessMimeType } from "./previewKind";
 
 const SELECTED_KEY = "chat.background";
@@ -112,7 +112,7 @@ class ChatBackground {
 
   async upload(file: Blob): Promise<string> {
     const id = `${UPLOAD_PREFIX}${crypto.randomUUID()}`;
-    await this.restore(id, await scaledImage(file, MAX_SIDE, "long", IMAGE_TYPE));
+    await this.restore(id, isVector(file) ? file : await scaledImage(file, MAX_SIDE, "long", IMAGE_TYPE));
     return id;
   }
 

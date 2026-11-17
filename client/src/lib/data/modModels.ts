@@ -1,4 +1,4 @@
-import { DEFAULT_GLASS, type GlassLook } from "$lib/design/backgrounds";
+import { DEFAULT_VEIL, type VeilLook } from "$lib/design/backgrounds";
 
 export const MOD_COMPONENTS = [
   "Pane",
@@ -35,7 +35,7 @@ export interface ModLookColors {
   contrast: "more" | null;
 }
 
-export type ModGlass = GlassLook;
+export type ModGlass = VeilLook;
 
 export interface ModGroundStop {
   at: number | null;
@@ -532,9 +532,8 @@ const toGlass = (raw: unknown): ModGlass | false => {
   if (raw === false) return false;
   const wire = record(raw) ?? {};
   return {
-    blur: number(wire, "blur") ?? DEFAULT_GLASS.blur,
-    tint: string(wire, "tint") ?? DEFAULT_GLASS.tint,
-    opacity: number(wire, "opacity") ?? DEFAULT_GLASS.opacity,
+    tint: string(wire, "tint") ?? DEFAULT_VEIL.tint,
+    opacity: number(wire, "opacity") ?? DEFAULT_VEIL.opacity,
   };
 };
 

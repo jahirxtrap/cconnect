@@ -211,6 +211,16 @@ const ART_GLYPHS = /[─-▟]/u;
 
 export const svgSource = (source: string): string => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
 
+const ALIGN_POSITIONS: Record<string, string> = { Min: "0%", Mid: "50%", Max: "100%" };
+
+export const svgFit = (source: string): string => {
+  const root = new DOMParser().parseFromString(source, "image/svg+xml").documentElement;
+  const [align = "xMidYMid", mode = "meet"] = (root.getAttribute("preserveAspectRatio") ?? "").trim().split(/\s+/).filter(Boolean);
+  if (align === "none") return "object-fit: fill";
+  const [, x = "Mid", y = "Mid"] = /^x(Min|Mid|Max)Y(Min|Mid|Max)$/.exec(align) ?? [];
+  return `object-fit: ${mode === "slice" ? "cover" : "contain"}; object-position: ${ALIGN_POSITIONS[x]} ${ALIGN_POSITIONS[y]}`;
+};
+
 const armPath = (arm: string, axis: number): string =>
   ({ l: `M0 ${axis}H1`, r: `M1 ${axis}H2`, u: `M1 0V${axis}`, d: `M1 ${axis}V2` })[arm] ?? "";
 

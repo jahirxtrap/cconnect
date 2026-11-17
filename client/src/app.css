@@ -330,28 +330,17 @@ html[data-theme="dark"] {
   bottom: calc((var(--keyboard, 0px) + var(--safe-bottom)) * -1);
 }
 
+.behind-status-bar {
+  top: calc(var(--safe-top) * -1);
+}
+
 .glass-panel {
   background-color: var(--c-panel-bg);
   backdrop-filter: blur(var(--glass-blur));
 }
 
-[data-block] {
-  view-timeline: --block block;
-}
-
-[data-block-head].sticky + [data-block-body] {
-  animation: cover-under-head linear both;
-  animation-timeline: --block;
-  animation-range: exit-crossing 0% exit-crossing 100%;
-}
-
-@keyframes cover-under-head {
-  from {
-    clip-path: inset(0 0 0 0);
-  }
-  to {
-    clip-path: inset(calc(100% + var(--chat-head)) 0 0 0);
-  }
+.over-backdrop [data-block-head].sticky {
+  background-color: transparent;
 }
 
 .gutter-veil {
@@ -363,16 +352,16 @@ html[data-theme="dark"] {
   transition: none;
 }
 
-.glass-column {
-  max-width: calc(var(--chat-column) + 2 * var(--glass-fade));
+.veil-column {
+  max-width: calc(var(--chat-column) + 2 * var(--veil-fade));
 }
 
-.glass-fade {
+.veil-fade {
   mask-image: linear-gradient(
     to right,
     transparent,
-    #000 var(--glass-fade),
-    #000 calc(100% - var(--glass-fade)),
+    #000 var(--veil-fade),
+    #000 calc(100% - var(--veil-fade)),
     transparent
   );
 }
@@ -561,12 +550,6 @@ html.pdf-screen .pdf-screen-root {
 @property --press-alpha {
   syntax: "<number>";
   inherits: false;
-  initial-value: 0;
-}
-
-@property --sheet-under {
-  syntax: "<number>";
-  inherits: true;
   initial-value: 0;
 }
 
@@ -873,8 +856,7 @@ a > .md-link-icon:last-child {
 }
 
 .markdown [data-code-block] pre {
-  background: var(--color-surface-nested);
-  border-radius: 0;
+  background: none;
 }
 
 .markdown blockquote {

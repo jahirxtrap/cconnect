@@ -1,5 +1,6 @@
 import type { ModLook } from "$lib/data/modModels";
-import { DEFAULT_GLASS, NO_BACKGROUND, type BackgroundEffects, type GlassLook } from "$lib/design/backgrounds";
+import { settings } from "$lib/data/settings.svelte";
+import { DEFAULT_VEIL, NO_BACKGROUND, type VeilLook } from "$lib/design/backgrounds";
 import { packs } from "$lib/design/packs/registry.svelte";
 import { theme } from "$lib/design/theme.svelte";
 import { DEFAULT_THEMES } from "$lib/design/themes";
@@ -16,9 +17,9 @@ export const windowBackdrop = new WindowBackdrop();
 export const backdropOf = (look: ModLook | null, modBackground: boolean, current: string): boolean =>
   modBackground ? !!(look?.scene || look?.ground) : current !== NO_BACKGROUND;
 
-export const glassOf = (look: ModLook | null, modBackground: boolean, effects: BackgroundEffects): GlassLook | null => {
-  if (!effects.glass) return null;
-  if (!modBackground) return DEFAULT_GLASS;
+export const veilOf = (look: ModLook | null, modBackground: boolean): VeilLook | null => {
+  if (!settings.backgroundVeil) return null;
+  if (!modBackground) return DEFAULT_VEIL;
   return look?.scene && look.scene.glass ? look.scene.glass : null;
 };
 

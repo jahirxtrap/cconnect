@@ -72,7 +72,6 @@ export type SettingsDialog =
   | "packs"
   | "accent"
   | "chat_background"
-  | "background_settings"
   | "shortcuts"
   | "discord"
   | "browser"
@@ -105,7 +104,8 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "theme", label: "THEME", value: themeValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "language", label: "LANGUAGE", value: localeValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "accent", label: "ACCENT", value: accentValue, section: "client", group: "SETTINGS_CLIENT" },
-  { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT", dialog: "chat_background" },
+  { id: "background_veil", label: "BACKGROUND_VEIL", summary: "BACKGROUND_VEIL_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "chat_background" },
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "packs", label: "PACKS", value: packsValue, section: "client", group: "SETTINGS_CLIENT", dialog: "packs" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },

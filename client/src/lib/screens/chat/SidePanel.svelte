@@ -4,6 +4,7 @@
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { t } from "$lib/i18n/index.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { BlockExpansion } from "./blockExpansion.svelte";
@@ -26,7 +27,6 @@
     onSuggest?: SuggestionPicker | null;
     bottomInset?: number;
     glass?: boolean;
-    underInset?: number;
     column?: boolean;
   }
 
@@ -44,7 +44,6 @@
     onSuggest = null,
     bottomInset = 0,
     glass = false,
-    underInset = 0,
     column = false,
   }: Props = $props();
 
@@ -84,7 +83,7 @@
       dragging = false;
       onDragging(false);
       if (live < CLOSE_BELOW) {
-        exitFrom = under;
+        exitFrom = drop;
         onHeight(PEEK);
         onClose();
       } else if (live < FULL_ABOVE) {
@@ -116,7 +115,10 @@
   const shown = $derived(Math.min(MAX, Math.max(PEEK, height)));
   const hiddenFraction = $derived(Math.max(0, (PEEK - Math.max(MIN, height)) / PEEK));
   let panelHeight = $state(0);
-  const under = $derived(panelHeight > 0 ? (hiddenFraction * panelHeight) / (panelHeight + underInset) : 0);
+  let surface = $state<HTMLDivElement | null>(null);
+  const drop = $derived(hiddenFraction * panelHeight);
+  const reach = "calc(var(--composer-height, 0px) + var(--safe-bottom) + var(--keyboard, 0px))";
+  const motion = $derived(dragging || instant ? "" : "duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]");
 
   $effect(() => {
     void messages.at(-1)?.text;
@@ -135,38 +137,36 @@
 
   const PANEL_MS = 350;
 
-  const slide = (_node: Element, { duration }: { duration: number }) => {
+  const slide = (node: Element, { duration }: { duration: number }) => {
     const from = exitFrom;
-    exitFrom = 0;
+    const travel = surface?.offsetHeight ?? (node as HTMLElement).offsetHeight;
     return {
       duration,
       easing: cubicOut,
-      css: (progress: number) => `--sheet-under: ${from + (1 - from) * (1 - progress)}`,
+      css: (progress: number) => `transform: translateY(${from + (travel - from) * (1 - progress)}px)`,
     };
   };
 </script>
 
 <div
-  bind:this={panel}
-  bind:clientHeight={panelHeight}
+  bind:this={surface}
+  aria-hidden="true"
   transition:slide={{ duration: instant ? 0 : PANEL_MS }}
-  class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col {dragging || instant
-    ? ''
-    : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
-  style="height: {shown}%; --sheet-under: {under}; transform: translateY(calc(var(--sheet-under) * (100% + var(--composer-height, 0px))))"
->
+  class="pointer-events-none absolute inset-x-0 z-10 shadow-float {glass ? (layout.mobile ? '' : 'glass-panel') : 'bg-background'} {motion &&
+    `transition-[top] ${motion}`}"
+  style="top: {PERCENT - shown}%; bottom: calc({reach} * -1); transform: translateY({drop}px); clip-path: inset(-100% 0 0 0); border-top-left-radius: calc(var(--radius-dock) * {corner}); border-top-right-radius: calc(var(--radius-dock) * {corner}); {glass &&
+  layout.mobile
+    ? 'background-color: var(--c-panel-bg)'
+    : ''}"
+></div>
+<div class="pointer-events-none absolute inset-0 z-10 overflow-hidden">
   <div
-    aria-hidden="true"
-    class="pointer-events-none absolute inset-x-0 top-0 -z-10 shadow-float {glass ? 'glass-panel' : 'bg-background'}"
-    style="bottom: calc(var(--composer-height, 0px) * -1); border-top-left-radius: calc(var(--radius-dock) * {corner}); border-top-right-radius: calc(var(--radius-dock) * {corner})"
-  ></div>
-  <div
-    class="relative flex min-h-0 flex-1 flex-col"
-    style="clip-path: inset(0 0 calc(var(--sheet-under) * (100% + var(--composer-height, 0px))) 0 round calc(var(--radius-dock) * {corner}) calc(var(--radius-dock) * {corner}) 0 0)"
+    bind:this={panel}
+    bind:clientHeight={panelHeight}
+    transition:slide={{ duration: instant ? 0 : PANEL_MS }}
+    class="pointer-events-auto absolute inset-x-0 bottom-0 flex min-h-0 flex-col {motion && `transition-[height] ${motion}`}"
+    style="height: {shown}%; transform: translateY({drop}px)"
   >
-    {#if shown >= MAX}
-      <span class="pointer-events-none absolute inset-x-0 top-0 z-10 border-t border-outline-variant"></span>
-    {/if}
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
       onpointerdown={onPointerDown}

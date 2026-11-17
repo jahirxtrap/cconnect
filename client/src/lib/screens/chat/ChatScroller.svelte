@@ -39,6 +39,8 @@
   const OWN_TOP_PX = 1;
   const SCROLL_BUTTON_GAP = 12;
   const HALF = 2;
+  const TOP_LINE = "0px 0px -100% 0px";
+  const HALF_SCROLLBAR = "calc(var(--scrollbar-width, 0px) / 2)";
 
   let container = $state<HTMLDivElement | null>(null);
   let content = $state<HTMLDivElement | null>(null);
@@ -189,18 +191,21 @@
     horizontalScrollbar = container.offsetHeight - container.clientHeight;
   };
 
+  const measureWidths = () => {
+    if (!container || !content) return;
+    containerWidth = container.clientWidth;
+    contentWidth = content.clientWidth;
+  };
+
   const onscroll = () => {
     if (!container) return;
-    measureScrollbar();
     const top = container.scrollTop;
     const ours = Math.abs(top - ownTop) <= OWN_TOP_PX;
     ownTop = -1;
     if (!ours) pendingTop = null;
     onScroll?.(top);
     belowFold = distanceToBottom();
-    viewport = container.clientHeight;
     if (!ours) follow = belowFold <= AT_BOTTOM_PX;
-    updatePinned();
     onMove?.();
     if (distanceToTop() < LOAD_MORE_PX) onNearTop?.();
   };
@@ -210,8 +215,10 @@
     const inner = content;
     if (!element || !inner) return;
     measureScrollbar();
+    measureWidths();
     const observer = new ResizeObserver(() => {
       measureScrollbar();
+      measureWidths();
       if (pendingTop !== null) scrollTo(pendingTop);
       else if (follow) scrollToEnd();
       belowFold = distanceToBottom();
@@ -223,25 +230,42 @@
     observer.observe(inner);
     return () => observer.disconnect();
   });
+
+  $effect(() => {
+    const element = container;
+    const inner = content;
+    if (!element || !inner) return;
+    const crossing = new IntersectionObserver(updatePinned, { root: element, rootMargin: TOP_LINE });
+    for (const row of inner.children) crossing.observe(row);
+    const rows = new MutationObserver((records) => {
+      for (const record of records) {
+        for (const node of record.removedNodes) if (node instanceof Element) crossing.unobserve(node);
+        for (const node of record.addedNodes) if (node instanceof Element) crossing.observe(node);
+      }
+    });
+    rows.observe(inner, { childList: true });
+    return () => {
+      rows.disconnect();
+      crossing.disconnect();
+    };
+  });
 </script>
 
 <div class="relative h-full">
   <div
     bind:this={container}
-    bind:clientWidth={containerWidth}
+    data-chat-viewport
     {onscroll}
     use:viewportScrollbar
     use:dockArea={dock}
-    style={centered
-      ? `--viewport-shift: calc(var(--scrollbar-width, 0px) / 2); --viewport-inset: calc(${(containerWidth - contentWidth) / 2}px + var(--page-inset))`
-      : undefined}
+    style:--viewport-shift={centered ? HALF_SCROLLBAR : undefined}
+    style:--viewport-inset={centered ? `calc(${(containerWidth - contentWidth) / HALF}px + var(--page-inset))` : undefined}
     class="selectable rounded-viewport isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
     <div
       bind:this={content}
-      bind:clientWidth={contentWidth}
-      class="shrink-0 {contentClass}"
-      style={centered ? "translate: calc(var(--scrollbar-width, 0px) / 2)" : undefined}
+      class="relative shrink-0 {contentClass}"
+      style:left={centered ? HALF_SCROLLBAR : undefined}
     >
       {@render children()}
     </div>

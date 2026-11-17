@@ -210,6 +210,13 @@ class Settings {
     this.#write("chat_full_width", value);
   }
 
+  get backgroundVeil() {
+    return this.#read<boolean>("background_veil");
+  }
+  set backgroundVeil(value: boolean) {
+    this.#write("background_veil", value);
+  }
+
   get projectCommitOpen() {
     return this.#read<boolean>("project_commit_open");
   }

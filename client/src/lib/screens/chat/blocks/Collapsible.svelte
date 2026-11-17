@@ -2,8 +2,10 @@
   import type { Snippet } from "svelte";
   import { gridHeight } from "$lib/ui/gridHeight";
   import type { IconSource } from "$lib/ui/icons";
+  import { windowBackdrop } from "../backdrop.svelte";
   import { insideCard, provideCardFrame } from "./cards";
   import CollapsibleHead from "./CollapsibleHead.svelte";
+  import HeadVeil from "./HeadVeil.svelte";
   import type { HeadStatus, HeadTone } from "./headTones";
   import { provideStickyHeads, stickyHeads } from "./stickyHeads";
 
@@ -49,12 +51,12 @@
   const nested = insideCard();
   provideCardFrame();
 
-  const tint = nested ? "bg-surface-nested" : "bg-card";
-  const headClass = sticky ? `group/head sticky top-0 z-20 ${tint} data-[stuck]:shadow-sm` : tint;
+  const headClass = sticky ? "group/head sticky top-0 z-20 bg-card data-[stuck]:shadow-sm" : "";
 
   let localExpanded = $state(false);
 
   const isExpanded = $derived(expanded ?? localExpanded);
+  const opaqueHead = $derived(sticky && isExpanded && windowBackdrop.shown);
 
   const summary = $derived(isExpanded ? "" : (preview ?? "").replace(/\s+/g, " ").trim());
 
@@ -64,8 +66,11 @@
   };
 </script>
 
-<div data-block class="mx-(--page-inset) overflow-clip rounded-panel {tint}">
-  <div data-block-head class={headClass}>
+<div data-block class="mx-(--page-inset) overflow-clip rounded-panel {nested ? 'bg-surface-nested' : 'bg-card'}">
+  <div use:gridHeight data-block-head class={headClass}>
+    {#if opaqueHead}
+      <HeadVeil tint={nested ? "bg-surface-nested" : "bg-card"} />
+    {/if}
     <CollapsibleHead
       {label}
       icon={IconComponent}
@@ -83,7 +88,7 @@
     />
   </div>
   {#if isExpanded && children && !labelOnly}
-    <div use:gridHeight data-block-body class={tint}>
+    <div use:gridHeight data-block-body>
       <div
         class="{bodyClass} px-2.5 pb-2.5 [--page-inset:0px] {nested
           ? '[--color-surface-nested:var(--c-surface-variant)]'

@@ -638,7 +638,6 @@
         {component}
         bottomInset={dockLift}
         glass={overBackdrop}
-        underInset={composerHeight}
         column={!settings.chatFullWidth}
       />
     {/if}

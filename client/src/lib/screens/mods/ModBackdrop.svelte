@@ -1,20 +1,24 @@
 <script lang="ts">
   import type { ModGround } from "$lib/data/modModels";
-  import { artFrame, type BackgroundEffects } from "$lib/design/backgrounds";
+  import { artBleed, artFrame, type BackgroundEffects } from "$lib/design/backgrounds";
   import { theme } from "$lib/design/theme.svelte";
+  import { imageCache } from "$lib/services/imageCache.svelte";
+  import { screenPixels, vectorBlob } from "$lib/services/imageSize";
   import { groundColor, lookScheme } from "./lookColors";
   import type { ModSurface } from "./modSurface.svelte";
-  import { svgSource } from "./modStyle";
+  import { svgFit, svgSource } from "./modStyle";
 
   interface Props {
     mods: ModSurface;
     effects: BackgroundEffects;
+    still?: boolean;
     class?: string;
   }
 
-  const { mods, effects, class: className = "" }: Props = $props();
+  const { mods, effects, still = false, class: className = "" }: Props = $props();
 
   const PERCENT = 100;
+  const SCENE_KEY = "mod-scene:";
   const patternId = $props.id();
 
   const look = $derived(mods.look);
@@ -22,6 +26,16 @@
   const scene = $derived(look?.scene ?? null);
   const ground = $derived(scene ? null : (look?.ground ?? null));
   const frame = $derived(artFrame(effects));
+  const stillKey = $derived(still && scene ? `${SCENE_KEY}${scene.source}` : null);
+  const stillPixels = $derived(screenPixels(artBleed(effects)));
+  const sceneUrl = $derived(stillKey ? imageCache.get(stillKey, stillPixels) : scene ? svgSource(scene.source) : null);
+  const sceneFit = $derived(stillKey && scene ? svgFit(scene.source) : "");
+
+  $effect(() => {
+    const key = stillKey;
+    const source = scene?.source;
+    if (key && source) imageCache.load(key, async () => vectorBlob(source), stillPixels);
+  });
 
   let image = $state<string | null>(null);
 
@@ -71,7 +85,9 @@
 <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden {className}">
   <div class="absolute" style={frame}>
     {#if scene}
-      <img src={svgSource(scene.source)} alt="" draggable="false" class="absolute inset-0 size-full max-w-none select-none" />
+      {#if sceneUrl}
+        <img src={sceneUrl} alt="" draggable="false" class="absolute inset-0 size-full max-w-none select-none" style={sceneFit} />
+      {/if}
     {:else if ground?.kind === "color"}
       <div class="absolute inset-0" style="background-color: {color(ground.color)}"></div>
     {:else if ground?.kind === "gradient"}

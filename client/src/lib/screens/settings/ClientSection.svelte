@@ -38,9 +38,6 @@
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import AccentPicker from "./AccentPicker.svelte";
-  import BackgroundActions from "./BackgroundActions.svelte";
-  import BackgroundPickDialog from "./BackgroundPickDialog.svelte";
-  import BackgroundPicker from "./BackgroundPicker.svelte";
   import BrowserDialog from "./BrowserDialog.svelte";
   import ChatBackgroundDialog from "./ChatBackgroundDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
@@ -52,7 +49,7 @@
   import ThemeDialog from "./ThemeDialog.svelte";
   import ThemePicker from "./ThemePicker.svelte";
 
-  const ROW_DIALOGS: readonly SettingsDialog[] = ["appearance", "theme", "language", "accent", "chat_background"];
+  const ROW_DIALOGS: readonly SettingsDialog[] = ["appearance", "theme", "language", "accent"];
 
   let dialog = $state<SettingsDialog | null>(null);
   let themeTabIndex = $state(0);
@@ -90,22 +87,6 @@
         <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.appAccent}"></span></span>
       {/snippet}
     </PreferenceRow>
-    <PreferenceRow
-      icon={ImageIcon}
-      title={t("CHAT_BACKGROUND")}
-      summary={rowSummary("chat_background")}
-      onclick={() => (dialog = "chat_background")}
-    >
-      {#snippet trailing()}
-        {#if chatBackground.current !== NO_BACKGROUND}
-          <span class="flex h-7 w-9 items-center justify-center">
-            <span class="relative size-6 overflow-hidden rounded-md border border-outline-variant bg-background">
-              <ChatBackdrop thumbnail id={chatBackground.current} effects={chatBackground.effects} />
-            </span>
-          </span>
-        {/if}
-      {/snippet}
-    </PreferenceRow>
   {:else}
     <PreferenceRow icon={appearanceIcon} title={t("APPEARANCE")} flash={highlight.is("appearance")}>
       {#snippet trailing()}
@@ -131,13 +112,24 @@
     <PreferenceRow icon={Palette} title={t("ACCENT")} flash={highlight.is("accent")}>
       <AccentPicker />
     </PreferenceRow>
-    <PreferenceRow icon={ImageIcon} title={t("CHAT_BACKGROUND")} flash={highlight.is("chat_background")}>
-      {#snippet trailing()}
-        <BackgroundActions onAdjust={() => (dialog = "chat_background")} />
-      {/snippet}
-      <BackgroundPicker onAdjust={() => (dialog = "chat_background")} />
-    </PreferenceRow>
   {/if}
+  <PreferenceRow
+    icon={ImageIcon}
+    title={t("CHAT_BACKGROUND")}
+    summary={rowSummary("chat_background")}
+    flash={highlight.is("chat_background")}
+    onclick={() => (dialog = "chat_background")}
+  >
+    {#snippet trailing()}
+      {#if chatBackground.current !== NO_BACKGROUND}
+        <span class="flex h-7 w-9 items-center justify-center">
+          <span class="relative size-6 overflow-hidden rounded-md border border-outline-variant bg-background">
+            <ChatBackdrop thumbnail id={chatBackground.current} effects={chatBackground.effects} />
+          </span>
+        </span>
+      {/if}
+    {/snippet}
+  </PreferenceRow>
   {#if layout.mobile}
     <PreferenceRow
       icon={Languages}
@@ -303,15 +295,8 @@
   <FontDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "packs"}
   <PacksDialog onDismiss={() => (dialog = null)} />
-{:else if dialog === "chat_background" || dialog === "background_settings"}
-  {#if layout.mobile}
-    <BackgroundPickDialog onAdjust={() => (dialog = "background_settings")} onDismiss={() => (dialog = null)} />
-    {#if dialog === "background_settings"}
-      <ChatBackgroundDialog onDismiss={() => (dialog = "chat_background")} />
-    {/if}
-  {:else}
-    <ChatBackgroundDialog onDismiss={() => (dialog = null)} />
-  {/if}
+{:else if dialog === "chat_background"}
+  <ChatBackgroundDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "shortcuts"}
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "discord"}

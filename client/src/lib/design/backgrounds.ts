@@ -11,7 +11,6 @@ export interface BackgroundEffects extends BackgroundLook {
   fit: BackgroundFit;
   x: number;
   y: number;
-  glass: boolean;
 }
 
 export const BACKGROUND_STYLES = {
@@ -22,7 +21,7 @@ export const BACKGROUND_STYLES = {
 
 export type BackgroundStyle = keyof typeof BACKGROUND_STYLES;
 
-export const DEFAULT_EFFECTS: BackgroundEffects = { ...BACKGROUND_STYLES.dark, fit: "cover", x: 50, y: 50, glass: true };
+export const DEFAULT_EFFECTS: BackgroundEffects = { ...BACKGROUND_STYLES.dark, fit: "cover", x: 50, y: 50 };
 
 const SHARP_EFFECTS: BackgroundEffects = { ...DEFAULT_EFFECTS, ...BACKGROUND_STYLES.sharp };
 
@@ -36,13 +35,12 @@ export const BUILTIN_BACKGROUNDS: readonly { id: BackgroundArt; effects: Partial
   { id: "logo", effects: { ...BACKGROUND_STYLES.sharp, opacity: 8 } },
 ];
 
-export interface GlassLook {
-  blur: number | null;
+export interface VeilLook {
   tint: string | null;
   opacity: number;
 }
 
-export const DEFAULT_GLASS: GlassLook = { blur: null, tint: null, opacity: 0.6 };
+export const DEFAULT_VEIL: VeilLook = { tint: null, opacity: 0.4 };
 
 export const NO_BACKGROUND = "none";
 

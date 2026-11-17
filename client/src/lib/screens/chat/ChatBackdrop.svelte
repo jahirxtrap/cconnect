@@ -2,7 +2,7 @@
   import { chatBackground } from "$lib/data/chatBackground.svelte";
   import { artBleed, artFrame, MOD_BACKGROUND, type BackgroundArt, type BackgroundEffects } from "$lib/design/backgrounds";
   import { packs } from "$lib/design/packs/registry.svelte";
-  import { devicePixels, scaledUrl } from "$lib/services/imageSize";
+  import { devicePixels, scaledUrl, screenPixels } from "$lib/services/imageSize";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import LogoGlyph from "$lib/ui/LogoGlyph.svelte";
 
@@ -11,10 +11,11 @@
     effects: BackgroundEffects;
     file?: Blob | null;
     thumbnail?: boolean;
+    still?: boolean;
     class?: string;
   }
 
-  const { id, effects, file = null, thumbnail = false, class: className = "" }: Props = $props();
+  const { id, effects, file = null, thumbnail = false, still = false, class: className = "" }: Props = $props();
 
   let loaded = $state<string | null>(null);
   let width = $state(0);
@@ -24,8 +25,8 @@
   const bleed = $derived(artBleed(effects));
   const pixels = $derived(thumbnail && width && height ? devicePixels(Math.max(width, height) + bleed * 2) : 0);
 
-  const wanted = $derived(thumbnail ? pixels : undefined);
-  const measured = $derived(!thumbnail || pixels > 0);
+  const wanted = $derived(still ? screenPixels(bleed) : thumbnail ? pixels : undefined);
+  const measured = $derived(still || !thumbnail || pixels > 0);
 
   $effect(() => {
     if (!file && measured) chatBackground.loadImage(id, wanted);
