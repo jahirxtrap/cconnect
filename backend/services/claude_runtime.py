@@ -1091,6 +1091,23 @@ async def run_prompt(
             }]
         return []
 
+    def _drop_pending() -> list[dict]:
+        """Ends the prompts the CLI joined and dropped before the conversation, replayed or not."""
+        for item in handed.values():
+            item["taken"] = True
+        handed.clear()
+        dropped = chips[:]
+        chips.clear()
+        pending_announce.clear()
+        if not dropped:
+            return []
+        return [{
+            "type": "dequeued",
+            "ids": [c["id"] for c in dropped if c.get("id")],
+            "text": "",
+            "consumed": sum(1 for c in dropped if c["drained"]),
+        }]
+
     def _flush_users(sid: str | None) -> list[dict]:
         if drain is None or not sid or not cwd:
             return []
@@ -1410,6 +1427,9 @@ async def run_prompt(
                     }
                     context_tokens = meta.get("post_tokens") or None
                     yield {"type": "context", "context_tokens": context_tokens}
+                elif mods.prompt_dropped(message):
+                    for event in [*_system_events(subtype, data, vis()), *_drop_pending()]:
+                        yield event
                 else:
                     for event in _system_events(subtype, data, vis()):
                         yield event

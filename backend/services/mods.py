@@ -93,6 +93,13 @@ def handles(message: Any) -> bool:
     return type(message).__name__ == "SystemMessage" and getattr(message, "subtype", None) in _SUBTYPES
 
 
+def prompt_dropped(message: Any) -> bool:
+    """A notice that the prompt the CLI was handed ended without staying in the conversation."""
+    data = getattr(message, "data", None)
+    outcome = data.get("prompt_submit_outcome") if isinstance(data, dict) else None
+    return isinstance(outcome, dict) and outcome.get("prompt_kept") is False
+
+
 def notice(text: Any, name: Optional[str] = None, level: Optional[str] = None, uuid: Optional[str] = None) -> dict:
     return {"type": "notice", "text": str(text or "").strip(), "name": name, "level": level, "uuid": uuid}
 

@@ -459,23 +459,32 @@ class DevicesHub:
         return info.get(AVD_NAME) or info.get(LEGACY_AVD_NAME) or self._avds.get(serial, "")
 
     def snapshot(self) -> dict:
-        connected = self._connected()
         running = {self._avd_of(serial): serial for serial in self._rows if kind_of(serial) == EMULATOR}
         emulators = self._emulators()
         labels = self._labels(emulators)
+        devices = [self._device(row, labels) for row in self._rows.values()]
+        listed = {device["saved"] for device in devices if device["saved"]}
         return {
             "type": "state",
             "tools": {**device_tools.status(), "installing": self._installing},
             "failure": self._failure,
             "scanning": not self._listed.is_set(),
-            "devices": [self._device(row, labels) for row in self._rows.values()],
-            "saved": [{**entry, "address": self.address_for(entry), "connected": entry["serial"] in connected} for entry in self._saved],
+            "devices": devices,
+            "saved": [{**entry, "address": self.address_for(entry), "connected": entry["id"] in listed} for entry in self._saved],
             "emulators": [{**item, "serial": running.get(item["name"])} for item in emulators],
             "pairing": {key: value for key, value in self._pairing.items() if key != "password"} if self._pairing else None,
         }
 
     def _saved_for(self, hardware: str) -> Optional[dict]:
         return next((entry for entry in self._saved if entry["serial"] == hardware), None) if hardware else None
+
+    def _kept(self, row: dict, info: dict) -> Optional[dict]:
+        """The saved entry of a listed device: by hardware serial, or by Wi-Fi host until adb describes it."""
+        kept = self._saved_for(info.get(SERIAL, ""))
+        address = self._address_of(row["serial"]) if kept is None and row["kind"] == WIFI else None
+        if not address:
+            return kept
+        return next((entry for entry in self._saved if entry["address"] and _host_of(entry["address"]) == _host_of(address)), None)
 
     def _address_of(self, serial: str) -> Optional[str]:
         if ":" in serial and not serial.endswith(_CONNECT_SUFFIX):
@@ -485,7 +494,7 @@ class DevicesHub:
 
     def _device(self, row: dict, labels: Optional[dict[str, str]] = None) -> dict:
         info = self._info.get(row["serial"], {})
-        kept = self._saved_for(info.get(SERIAL, ""))
+        kept = self._kept(row, info)
         sdk = info.get(SDK, "")
         avd = self._avd_of(row["serial"])
         if row["state"] != READY:

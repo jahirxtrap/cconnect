@@ -186,7 +186,8 @@ class PersistentSession:
 
         try:
             async for message in client.receive_messages():
-                if mods.handles(message):
+                reading = self.turn is not None or self._own_turn
+                if mods.handles(message) and not (reading and mods.prompt_dropped(message)):
                     for event in mods.events(message.subtype, message.data):
                         await self._notify(event)
                     continue
