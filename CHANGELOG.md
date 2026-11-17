@@ -1,7 +1,10 @@
-- On Windows, Update in the Server settings and `cconnect update` work however the server was started, in a terminal, with `--detach` or by the desktop app: it stops, updates and starts again by itself with the same exposure and port
-- A plugin option kept as a secret, such as an API key, is the same in every account: what you save in one, from the app or from a chat, reaches the others
-- With several accounts, a plugin whose MCP servers take options no longer starts them with every chat
-- When the server cannot check for updates, the Server settings say why
+- Chat background has a new Claude option, picked by default: when a mod gives the chat a theme, the chat takes its colors, its light or dark mode and its scene
+- A background fills the whole chat screen behind panels of glass, messages and code let it through, and Frosted glass blurs it behind the chat
+- With two chats side by side, the window takes the theme of the one you are in, and a chat in the right panel looks like the main one
+- Messages keep to a column in the middle of the chat, and Full-width chat spreads them across the panel
+- CConnect Extras adds Nebula, a new animated background
+- `cconnect update` says which version you have, whether it is already up to date and which version it installs
+- A chat opened while the app was still connecting loads its whole history, files pasted into the quick chat no longer land in the main chat, and restarting or updating the server no longer leaves processes behind that keep its port busy
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
