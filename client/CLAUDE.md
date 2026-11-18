@@ -316,6 +316,10 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 
 ## Small rules
 
+- Durations come from `ui/motion.ts`: `PANEL_MS` for sheets that open with content, `TOGGLE_MS` for
+  small pieces that change size, both with `PANEL_EASING`.
+- A dialog that switches or filters its content (catalogs, pickers) is `CompactDialog fullHeight` and
+  keeps the previous list while the next one loads; `CenteredProgress` only on its first load.
 - Plugin updates run on the server: `data/pluginUpdates.svelte.ts` keeps each environment's
   `plugin_updates` map from the list socket (and from `/claude/plugins` on load). A card shows the
   plugin's state in place of its on/off label, the detail disables its actions meanwhile, and
