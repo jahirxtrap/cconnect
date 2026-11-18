@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -13,7 +15,15 @@ _SETTINGS_FILE = "settings.json"
 _ATTRIBUTION = "attribution"
 _ATTRIBUTION_PARTS = ("commit", "pr")
 _LEGACY_ATTRIBUTION = "includeCoAuthoredBy"
+_ENV = "env"
+_ESSENTIAL_VAR = "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"
+_TELEMETRY_VAR = "DISABLE_TELEMETRY"
+_DO_NOT_TRACK_VAR = "DO_NOT_TRACK"
+_ERROR_REPORTING_VAR = "DISABLE_ERROR_REPORTING"
+_SWITCHED_ON = ("1", "true", "yes", "on")
+_LEVEL_VARS = {"no_telemetry": _TELEMETRY_VAR, "essential": _ESSENTIAL_VAR}
 
+DATA_SHARING_LEVELS = ("full", "no_telemetry", "essential")
 MAX_SAFE_INTEGER = 9007199254740991
 
 
@@ -28,6 +38,8 @@ class CliSettingDef:
     unset_by: Any = None
     read: Optional[Callable[[dict], Any]] = None
     write: Optional[Callable[[dict, Any], None]] = None
+    choices: tuple[str, ...] = ()
+    inherited: Optional[Callable[[], Any]] = None
 
 
 def _attributed(data: dict) -> Optional[bool]:
@@ -51,6 +63,50 @@ def _attribute(data: dict, enabled: Optional[bool]) -> None:
         data[_ATTRIBUTION] = kept
     else:
         data.pop(_ATTRIBUTION, None)
+
+
+def _env_of(data: Mapping[str, Any]) -> Mapping[str, Any]:
+    declared = data.get(_ENV)
+    return declared if isinstance(declared, dict) else {}
+
+
+def _sharing_in(env: Mapping[str, Any]) -> str:
+    if env.get(_ESSENTIAL_VAR):
+        return "essential"
+    if env.get(_TELEMETRY_VAR) or str(env.get(_DO_NOT_TRACK_VAR) or "").strip().lower() in _SWITCHED_ON:
+        return "no_telemetry"
+    return "full"
+
+
+def _shared_level(data: dict) -> str:
+    return _sharing_in(_env_of(data))
+
+
+def _share(data: dict, level: Optional[str]) -> None:
+    for name in (_ESSENTIAL_VAR, _TELEMETRY_VAR, _DO_NOT_TRACK_VAR):
+        discard(data, f"{_ENV}.{name}")
+    if level in _LEVEL_VARS:
+        assign(data, f"{_ENV}.{_LEVEL_VARS[level]}", "1")
+
+
+def _inherited_level() -> Optional[str]:
+    level = _sharing_in(os.environ)
+    return None if level == "full" else level
+
+
+def _reports_errors(data: dict) -> bool:
+    return not _env_of(data).get(_ERROR_REPORTING_VAR)
+
+
+def _report_errors(data: dict, enabled: Optional[bool]) -> None:
+    if enabled is False:
+        assign(data, f"{_ENV}.{_ERROR_REPORTING_VAR}", "1")
+    else:
+        discard(data, f"{_ENV}.{_ERROR_REPORTING_VAR}")
+
+
+def _inherited_reports() -> Optional[bool]:
+    return False if os.environ.get(_ERROR_REPORTING_VAR) else None
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -108,6 +164,27 @@ SETTINGS: dict[str, CliSettingDef] = {
         default=None,
         type=bool,
         description="Upload session transcripts to Anthropic",
+    ),
+    "data_sharing": CliSettingDef(
+        json_key=_ENV,
+        default="full",
+        type=str,
+        description="How much the CLI sends to Anthropic besides the conversations",
+        unset_by="full",
+        read=_shared_level,
+        write=_share,
+        choices=DATA_SHARING_LEVELS,
+        inherited=_inherited_level,
+    ),
+    "error_reports": CliSettingDef(
+        json_key=f"{_ENV}.{_ERROR_REPORTING_VAR}",
+        default=True,
+        type=bool,
+        description="Send the CLI's error reports to Anthropic",
+        unset_by=True,
+        read=_reports_errors,
+        write=_report_errors,
+        inherited=_inherited_reports,
     ),
     "subagent_effort": CliSettingDef(
         json_key="env.CLAUDE_CODE_SUBAGENT_EFFORT",
@@ -236,6 +313,8 @@ def describe() -> dict[str, dict]:
             "description": defn.description,
             "minimum": defn.minimum,
             "maximum": defn.maximum,
+            "choices": list(defn.choices),
+            "inherited": defn.inherited() if defn.inherited else None,
         }
         for key, defn in SETTINGS.items()
     }
@@ -249,6 +328,8 @@ def _apply(key: str, value: Any) -> None:
     if not blank:
         if not _valid(value, defn.type):
             raise ValueError(f"{key} expects {defn.type.__name__}")
+        if defn.choices and value not in defn.choices:
+            raise ValueError(f"{key} expects one of {', '.join(defn.choices)}")
         if defn.minimum is not None and value < defn.minimum:
             raise ValueError(f"{key} must be at least {defn.minimum}")
         if defn.maximum is not None and value > defn.maximum:

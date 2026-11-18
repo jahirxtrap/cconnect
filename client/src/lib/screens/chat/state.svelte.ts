@@ -44,6 +44,8 @@ import { reloadText } from "$lib/data/reload";
 import { settings } from "$lib/data/settings.svelte";
 import { AUTO_READ_ALWAYS, AUTO_READ_BACKGROUND, speech, speechKey } from "$lib/platform/speech.svelte";
 import { terminalTabs } from "$lib/data/terminalTabs.svelte";
+import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { promptLine, shellInput, shellRunOf } from "$lib/data/shellPrompt";
 
 const PREFILLED_TYPES = new Set<ComponentType>(["input", "notes", "path", "file", "color"]);
 
@@ -384,6 +386,14 @@ export class ChatState {
   rewindPreview = $state<RewindPreview | null>(null);
   rewindBusy = $state(false);
   pendingInput = $state<string | null>(null);
+  readonly shellHistory = $derived.by(() => [
+    ...new Set(
+      this.#sentTexts()
+        .map((text) => shellRunOf(text.trim())?.command)
+        .filter((command): command is string => !!command)
+        .reverse(),
+    ),
+  ]);
 
   readonly untouched = $derived(
     this.sessionId === null &&
@@ -525,7 +535,7 @@ export class ChatState {
   #opening = 0;
   #loads = 0;
   #reloads = 0;
-  #earlierPrompts: string[] = [];
+  #earlierPrompts = $state<string[]>([]);
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
   #transcriptOwner: string | null = null;
@@ -695,15 +705,32 @@ export class ChatState {
     this.elements = this.elements.filter((item) => item.id !== id);
   }
 
-  userHistory(): string[] {
-    const sent = [
+  #sentTexts(): string[] {
+    return [
       ...this.#earlierPrompts,
       ...this.messages.filter((item) => item.role === "user").map((item) => item.text),
       ...this.queue.map((item) => item.text),
     ];
-    return sent
-      .map((text) => text.trim())
+  }
+
+  userHistory(): string[] {
+    return this.#sentTexts()
+      .map((text) => promptLine(text.trim()))
       .reduce<string[]>((kept, text) => (text && text !== kept[kept.length - 1] ? [...kept, text] : kept), []);
+  }
+
+  get shellAvailable(): boolean {
+    const gated = this.capabilities?.gated ?? false;
+    return (
+      !this.agent &&
+      !!this.workingPath &&
+      (!gated || (!!securityKeys.keyFor(this.environment) && securityKeys.unlocked(this.environment) !== false))
+    );
+  }
+
+  runShell(line: string) {
+    const command = line.trim();
+    if (command) this.send(shellInput(command));
   }
 
   submit(text: string) {
@@ -832,10 +859,51 @@ export class ChatState {
 
   removeQueued(id: string) {
     if (this.#sent.has(id)) this.#socket.sendUnqueue(id);
+    this.#forgetQueued(id);
+  }
+
+  #forgetQueued(id: string) {
     this.queue = this.queue.filter((item) => item.id !== id);
     this.#sent.delete(id);
     this.#unacked.delete(id);
     this.#silent.delete(id);
+  }
+
+  #refuseShell(id: string) {
+    const item = this.queue.find((queued) => queued.id === id);
+    if (!item) return;
+    if (this.#optimisticChipId === id) {
+      const messageId = this.#optimisticMessageId;
+      this.messages = this.messages.filter((message) => message.id !== messageId);
+      this.#optimisticChipId = null;
+      this.#optimisticMessageId = null;
+      this.streaming = false;
+    }
+    this.#forgetQueued(id);
+    this.pendingInput = promptLine(item.text);
+    securityKeys.judge(this.environment, securityKeys.keyFor(this.environment), false);
+  }
+
+  #pendingShellAt(): number {
+    return this.messages.findLastIndex(
+      (item) => item.role === "user" && (item.shell ?? shellRunOf(item.text))?.code === null,
+    );
+  }
+
+  #onShellOutput(stream: "stdout" | "stderr", text: string) {
+    const at = this.#pendingShellAt();
+    const row = this.messages[at];
+    const run = row ? (row.shell ?? shellRunOf(row.text)) : null;
+    if (!run) return;
+    this.messages = this.messages.map((item, index) =>
+      index === at ? { ...item, shell: { ...run, [stream]: run[stream] + text } } : item,
+    );
+  }
+
+  #onShellExit(prompt: string) {
+    const at = this.#pendingShellAt();
+    if (at < 0) return;
+    this.messages = this.messages.map((item, index) => (index === at ? { ...item, text: prompt, shell: null } : item));
   }
 
   interrupt() {
@@ -1426,7 +1494,7 @@ export class ChatState {
     this.elements = [];
     this.addSharedAttachments(restored.attachments);
     for (const element of restored.elements) this.addElement(element);
-    this.pendingInput = restored.body;
+    this.pendingInput = promptLine(restored.body);
   }
 
   consumePendingInput(): string | null {
@@ -2552,6 +2620,7 @@ export class ChatState {
       }
       case "rejected":
         if (event.request === "load_history") this.#abandonPage();
+        else if (event.request === "prompt" && event.id) this.#refuseShell(event.id);
         break;
       case "assistant_text":
         this.#thinkingId = null;
@@ -2826,6 +2895,12 @@ export class ChatState {
         break;
       case "dequeued":
         this.#onDequeued(event.ids, event.text, event.ts);
+        break;
+      case "shell_output":
+        this.#onShellOutput(event.stream, event.text);
+        break;
+      case "shell_exit":
+        this.#onShellExit(event.prompt);
         break;
       case "tail":
         this.#onTail(event.items.map(parseSessionMessage));

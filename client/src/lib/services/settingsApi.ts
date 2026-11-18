@@ -46,6 +46,11 @@ export interface SettingsSnapshot {
   remoteControl: boolean | null;
   coAuthored: boolean;
   sessionUpload: boolean | null;
+  dataSharing: string;
+  dataSharingLevels: string[];
+  dataSharingInherited: string | null;
+  errorReports: boolean;
+  errorReportsInherited: boolean;
 }
 
 export interface SettingsPatch {
@@ -89,11 +94,20 @@ export interface SettingsPatch {
   remote_control?: boolean | null;
   co_authored?: boolean;
   session_upload?: boolean | null;
+  data_sharing?: string;
+  error_reports?: boolean;
 }
 
 export const RETENTION_FOREVER_DAYS = 36500;
 
-type Field = { effective?: unknown; default?: unknown; minimum?: unknown; maximum?: unknown };
+type Field = {
+  effective?: unknown;
+  default?: unknown;
+  minimum?: unknown;
+  maximum?: unknown;
+  choices?: unknown;
+  inherited?: unknown;
+};
 export type SettingsWire = Record<string, Field | undefined>;
 
 const boundOf = (wire: SettingsWire, key: string, bound: "minimum" | "maximum"): number | null =>
@@ -123,6 +137,14 @@ const effectiveFlag = (wire: SettingsWire, key: string): boolean | null => confi
 
 const effectiveNum = (wire: SettingsWire, key: string, fallback: number): number =>
   effective(wire, key, "number", fallback);
+
+const choicesOf = (wire: SettingsWire, key: string): string[] => {
+  const choices = wire[key]?.choices;
+  return Array.isArray(choices) ? choices.filter((choice): choice is string => typeof choice === "string") : [];
+};
+
+const inheritedOf = <T>(wire: SettingsWire, key: string, kind: string): T | null =>
+  typeof wire[key]?.inherited === kind ? (wire[key]!.inherited as T) : null;
 
 export const parseSettings = (wire: SettingsWire): SettingsSnapshot => ({
   account: effectiveStr(wire, "account", ""),
@@ -169,6 +191,11 @@ export const parseSettings = (wire: SettingsWire): SettingsSnapshot => ({
   remoteControl: effectiveFlag(wire, "remote_control"),
   coAuthored: effectiveBool(wire, "co_authored", true),
   sessionUpload: effectiveFlag(wire, "session_upload"),
+  dataSharing: effectiveStr(wire, "data_sharing", "full"),
+  dataSharingLevels: choicesOf(wire, "data_sharing"),
+  dataSharingInherited: inheritedOf(wire, "data_sharing", "string"),
+  errorReports: effectiveBool(wire, "error_reports", true),
+  errorReportsInherited: inheritedOf(wire, "error_reports", "boolean") === false,
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

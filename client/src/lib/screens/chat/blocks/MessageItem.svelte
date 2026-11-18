@@ -18,6 +18,7 @@
   import { usageErrorText } from "$lib/data/usageWindows";
   import { userContent } from "$lib/data/userContent";
   import { elementLabel } from "$lib/data/pickedElements";
+  import { shellRunOf } from "$lib/data/shellPrompt";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { agentFieldsOf, diffLinesOf } from "$lib/services/chatSocket";
   import { contextServer } from "$lib/services/serverContext";
@@ -42,6 +43,7 @@
   import QueryBlock from "./QueryBlock.svelte";
   import ReplyActions, { type ReplyHandlers } from "./ReplyActions.svelte";
   import SessionFacts from "./SessionFacts.svelte";
+  import ShellOutput from "./ShellOutput.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -137,12 +139,15 @@
 {#snippet userRow(props: Record<string, unknown>)}
   {@const content = userContent(message, server())}
   {@const body = typeof props.text === "string" ? props.text : content.body}
+  {@const shell = message.shell ?? shellRunOf(body)}
   {@const showTime = timestamps && message.timestamp !== null && settings.showTimestamps}
   {@const chips = content.attachments.length + content.elements.length}
   {@const corners = joinedCorners(prevRole === "user", nextRole === "user", "panel")}
   <div class="w-full px-(--page-inset)">
-    <div class="flex w-full min-w-0 flex-col {corners} bg-surface-variant px-3 py-2.5 {chips ? 'chat-gap' : ''}">
-      {#if body}
+    <div class="flex w-full min-w-0 flex-col {corners} bg-surface-variant px-3 py-2.5 {chips || shell ? 'chat-gap' : ''}">
+      {#if shell}
+        <ShellOutput run={shell} />
+      {:else if body}
         <p class="text-body-md leading-(--chat-line-body) wrap-anywhere whitespace-pre-wrap">{body}</p>
       {/if}
       {#if chips || showTime || message.sendStatus === "error"}

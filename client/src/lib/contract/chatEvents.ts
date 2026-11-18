@@ -63,6 +63,8 @@ export type ChatEvent =
   | Queued
   | Queue
   | Dequeued
+  | ShellOutput
+  | ShellExit
   | HistoryChunk
   | Tail
   | InteractionRequest
@@ -115,6 +117,7 @@ export interface Rejected {
   replay?: boolean | null;
   type: "rejected";
   request?: string | null;
+  id?: string | null;
   message: string;
 }
 export interface Activity {
@@ -922,6 +925,25 @@ export interface Dequeued {
   ids: (string | null)[];
   text?: string | null;
   consumed?: number;
+}
+export interface ShellOutput {
+  seq?: number | null;
+  ts?: number | null;
+  channel?: string | null;
+  parent?: string | null;
+  replay?: boolean | null;
+  type: "shell_output";
+  stream: "stdout" | "stderr";
+  text: string;
+}
+export interface ShellExit {
+  seq?: number | null;
+  ts?: number | null;
+  channel?: string | null;
+  parent?: string | null;
+  replay?: boolean | null;
+  type: "shell_exit";
+  prompt: string;
 }
 export interface HistoryChunk {
   seq?: number | null;

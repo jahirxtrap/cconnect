@@ -450,11 +450,18 @@
     remoteControl={snapshot.remoteControl}
     coAuthored={snapshot.coAuthored}
     sessionUpload={snapshot.sessionUpload}
+    dataSharing={snapshot.dataSharing}
+    dataSharingLevels={snapshot.dataSharingLevels}
+    dataSharingInherited={snapshot.dataSharingInherited}
+    errorReports={snapshot.errorReports}
+    errorReportsInherited={snapshot.errorReportsInherited}
     onConfirm={(values) =>
       void apply({
         remote_control: values.remoteControl,
         co_authored: values.coAuthored,
         session_upload: values.sessionUpload,
+        data_sharing: values.dataSharing,
+        error_reports: values.errorReports,
       })}
     onDismiss={() => (dialog = null)}
   />

@@ -1,5 +1,6 @@
 import type { ColumnShape } from "./databaseModels";
 import type { ModDrawn } from "./modModels";
+import type { ShellRun } from "./shellPrompt";
 import type { Usage } from "./usageWindows";
 import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
@@ -288,6 +289,7 @@ export interface ChatMessage {
   currentSession: CurrentSession | null;
   uuid: string | null;
   beforeCompaction: string | null;
+  shell: ShellRun | null;
 }
 
 export interface TodoItem {
@@ -536,5 +538,6 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   currentSession: null,
   uuid: null,
   beforeCompaction: null,
+  shell: null,
   ...patch,
 });

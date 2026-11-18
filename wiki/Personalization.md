@@ -24,7 +24,9 @@ to make one is in the [[Packs]].
 
 A search box finds any option by name or by its value, wherever it lives, and
 takes you to it. A **Privacy** section decides what leaves the machine: remote
-control from claude.ai, commit co-authorship, and session upload. The backend
+control from claude.ai, commit co-authorship, session upload, how much the CLI
+sends to Anthropic and its error reports. Below **Full**, the CLI lists only the
+model families, without versions. The backend
 also updates itself from here, and on desktop the local server is started,
 restarted or stopped from the same place. On the desktop Settings opens in the
 centre beside your chats, the same as Claude, Monitor, Shared and Notes.

@@ -76,7 +76,7 @@ export type ServerEvent =
       resident: boolean;
       agent: string | null;
     }
-  | { type: "rejected"; request: string | null; message: string }
+  | { type: "rejected"; request: string | null; id: string | null; message: string }
   | { type: "activity"; state: string | null; resident: boolean; account: string | null }
   | { type: "agent_state"; state: AgentState }
   | { type: "history"; items: Record<string, unknown>[]; startIndex: number; hasMore: boolean }
@@ -190,6 +190,8 @@ export type ServerEvent =
   | { type: "queued"; id: string | null; text: string; replay: boolean }
   | { type: "queue"; items: QueuedMessage[] }
   | { type: "dequeued"; ids: string[]; text: string | null; ts: number | null }
+  | { type: "shell_output"; stream: "stdout" | "stderr"; text: string }
+  | { type: "shell_exit"; prompt: string }
   | {
       type: "history_chunk";
       sessionId: string;
@@ -918,7 +920,7 @@ export class ChatSocket {
           errors: event.errors ?? 0,
         };
       case "rejected":
-        return { type: "rejected", request: event.request ?? null, message: event.message ?? "" };
+        return { type: "rejected", request: event.request ?? null, id: event.id ?? null, message: event.message ?? "" };
       case "notification":
         return { type: "notification", summary: event.text ?? "", status: event.result ?? null };
       case "notice":
@@ -982,6 +984,10 @@ export class ChatSocket {
           text: event.text ?? null,
           ts: event.ts ?? null,
         };
+      case "shell_output":
+        return { type: "shell_output", stream: event.stream, text: event.text };
+      case "shell_exit":
+        return { type: "shell_exit", prompt: event.prompt };
       case "agent":
         return { type: "agent", id: event.id ?? null, ...agentFieldsOf(wire) };
       case "task_running":

@@ -689,6 +689,9 @@
         onCommand={(command) =>
           command.requireConfirmation ? (confirmCommand = command) : chat.runCommand(command)}
         onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}
+        shellAvailable={!chat.sideOpen && chat.shellAvailable}
+        shellHistory={chat.shellHistory}
+        onShell={(command) => chat.runShell(command)}
         onAttach={chat.sideOpen ? null : (files) => chat.addAttachments(files)}
         onRemoveAttachment={(id) => chat.removeAttachment(id)}
         onCloseSide={chat.sideOpen ? closeSide : null}

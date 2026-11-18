@@ -5417,6 +5417,17 @@
           ],
           "default": null
         },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "message": {
           "type": "string"
         }
@@ -6107,6 +6118,160 @@
         "url"
       ],
       "title": "SharedFile",
+      "type": "object"
+    },
+    "ShellExit": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "replay": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "shell_exit",
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "prompt"
+      ],
+      "title": "ShellExit",
+      "type": "object"
+    },
+    "ShellOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "replay": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "shell_output",
+          "type": "string"
+        },
+        "stream": {
+          "enum": [
+            "stdout",
+            "stderr"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "stream",
+        "text"
+      ],
+      "title": "ShellOutput",
       "type": "object"
     },
     "Status": {
@@ -7773,6 +7938,8 @@
       "session_message": "#/$defs/SessionMessage",
       "session_started": "#/$defs/SessionStarted",
       "shared": "#/$defs/Shared",
+      "shell_exit": "#/$defs/ShellExit",
+      "shell_output": "#/$defs/ShellOutput",
       "status": "#/$defs/Status",
       "stop": "#/$defs/Stop",
       "tail": "#/$defs/Tail",
@@ -7982,6 +8149,12 @@
     },
     {
       "$ref": "#/$defs/Dequeued"
+    },
+    {
+      "$ref": "#/$defs/ShellOutput"
+    },
+    {
+      "$ref": "#/$defs/ShellExit"
     },
     {
       "$ref": "#/$defs/HistoryChunk"

@@ -20,6 +20,7 @@ from services import (
     mcp_lazy,
     mods,
     persistent_sessions,
+    shell_commands,
     todos as todos_store,
     tool_props,
     usage,
@@ -90,6 +91,9 @@ class LiveSession:
         self._transport = None
         self._stopping = False
         self._drained = asyncio.Event()
+        self._settled = asyncio.Event()
+        self._shell_folder = ""
+        self._shell_stop = None
         self._resident = None
         self.adopter = None
         self.resumer = None
@@ -793,6 +797,10 @@ class LiveSession:
             if item.get("id") and item["id"] in self._cancelled:
                 self._cancelled.discard(item["id"])
                 continue
+            if shell_commands.pending_command(item["text"]) is not None:
+                self._hold(item)
+                await self._settled.wait()
+                return
             try:
                 self._queued.remove(item)
             except ValueError:
@@ -800,7 +808,35 @@ class LiveSession:
             self._unconsumed += 1
             self._sent += 1
             self._inflight.append(item)
+            self._settled.clear()
             yield item
+
+    def _hold(self, item):
+        """Put a `!` command back at the head of the queue, where the next turn takes it."""
+        behind = []
+        while not self._inbox.empty():
+            behind.append(self._inbox.get_nowait())
+        for pending in (item, *behind):
+            self._inbox.put_nowait(pending)
+
+    async def run_shell(self, command):
+        """Run a `!` command where the chat's last one ended, streaming its output, and return its prompt."""
+        stop = asyncio.Event()
+        self._shell_stop = stop
+
+        async def emit(stream, text):
+            await self._emit({"type": "shell_output", "stream": stream, "text": text})
+
+        try:
+            prompt, _, self._shell_folder = await shell_commands.run(
+                self.state.cwd, self._shell_folder, command, emit, stop
+            )
+        except OSError as exc:
+            prompt = shell_commands.prompt_of(command, "", str(exc), shell_commands.FAILED_CODE)
+        finally:
+            self._shell_stop = None
+        await self._emit({"type": "shell_exit", "prompt": prompt})
+        return prompt
 
     async def cancel_queued(self, mid):
         item = next((it for it in self._queued if it["id"] == mid), None)
@@ -908,6 +944,7 @@ class LiveSession:
         self._prompt_id = None
         self._stopping = False
         self._drained.clear()
+        self._settled.clear()
         self._turn_open = True
         self.turn_split = False
         self._worker = asyncio.create_task(self._run(runner_factory))
@@ -984,6 +1021,9 @@ class LiveSession:
         half-written answer; killing the worker is the fallback."""
         worker = self._worker
         if worker is None or worker.done():
+            return
+        if self._shell_stop is not None:
+            self._shell_stop.set()
             return
         try:
             announced = False
@@ -1065,6 +1105,8 @@ class LiveSession:
                     self._results += 1
                     if self._results >= self._sent and self._unconsumed > 0:
                         await self._flush_inflight()
+                    if self._unconsumed <= 0:
+                        self._settled.set()
                     if not self._queued and self._unconsumed <= 0:
                         self._inbox.put_nowait(_CLOSE)
         except asyncio.CancelledError:

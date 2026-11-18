@@ -1,7 +1,12 @@
 ## In the chat
 
 Claude Code's own slash commands show up in the composer, plus a `/usage` view
-of your plan's token limits. The context ring in the composer bar shows how full
+of your plan's token limits. A message that starts with `!` runs as a shell
+command with the terminal's shell, like `!` in Claude Code: sent while Claude is
+working it waits in the queue like any message, a `cd` carries over to the chat's
+next `!` commands, and one that leaves the chat's folder goes back to it. The menu offers the chat's earlier `!` commands, the same ones arrow up walks
+back through, and Claude reads the command and its output and answers. It takes the
+security key, like the terminal. The context ring in the composer bar shows how full
 the context is, your session and weekly limits as they move, and how long the cache
 has left. A **quick chat** button opens a pane under the chat for a
 throwaway question — handy to ask something while a long task keeps running,

@@ -8,9 +8,11 @@
   import Plus from "@lucide/svelte/icons/plus";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import SquareSlash from "@lucide/svelte/icons/square-slash";
+  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
+  import { promptLine, SHELL_MARK } from "$lib/data/shellPrompt";
   import {
     SPACE_KEY,
     strokeOf,
@@ -78,6 +80,9 @@
     controls?: Snippet;
     band?: Snippet;
     column?: boolean;
+    shellAvailable?: boolean;
+    shellHistory?: string[];
+    onShell?: ((command: string) => void) | null;
   }
 
   const {
@@ -112,6 +117,9 @@
     column = false,
     controls,
     band,
+    shellAvailable = false,
+    shellHistory = [],
+    onShell = null,
   }: Props = $props();
 
   let fieldScroll = $state(0);
@@ -123,7 +131,7 @@
   const ring = $derived(accent ? ringVars(accent) : undefined);
 
   const queueLabel = (item: QueuedMessage) => {
-    const { text, elements: picked } = splitElements(item.text);
+    const { text, elements: picked } = splitElements(promptLine(item.text));
     return (
       text ||
       [...picked.map(elementLabel), ...item.attachments.map((path) => path.split(/[\\/]/).pop())].join(", ")
@@ -148,7 +156,11 @@
     picker.click();
   };
 
-  const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0 || elements.length > 0));
+  const shellMode = $derived(shellAvailable && draft.startsWith(SHELL_MARK));
+  const shellLine = $derived(draft.slice(SHELL_MARK.length));
+  const canSubmit = $derived(
+    !blocked && (shellMode ? !!shellLine.trim() : !!draft.trim() || attachments.length > 0 || elements.length > 0),
+  );
   const chipped = $derived(attachments.length > 0 || elements.length > 0);
   const busy = $derived(streaming || uploading);
   const commandsReady = $derived(commands.length > 0);
@@ -169,7 +181,8 @@
 
   const submit = () => {
     if (!canSubmit) return;
-    onSend(draft);
+    if (shellMode) onShell?.(shellLine);
+    else onSend(draft);
     onDraft("");
     leaveHistory();
   };
@@ -297,6 +310,12 @@
     field?.focus();
   };
 
+  const openShell = () => {
+    if (!draft.startsWith(SHELL_MARK)) write(SHELL_MARK);
+    reopen();
+    field?.focus();
+  };
+
   let actionsOpen = $state(false);
   let listening = $state(false);
   let heard = $state("");
@@ -363,12 +382,42 @@
       .map(({ command }) => command);
   });
 
-  type Entry = { command: CommandOption; row: null } | { command: null; row: ModCompletionRow };
+  const shellRank = (entry: string, token: string) => {
+    const lower = entry.toLowerCase();
+    if (lower === token) return -1;
+    if (lower.startsWith(token)) return 0;
+    return lower.includes(token) ? 2 : null;
+  };
+
+  const typedShell = $derived(
+    dismissed || !shellAvailable || !query.startsWith(SHELL_MARK) || query.includes("\n")
+      ? null
+      : query.slice(SHELL_MARK.length).trimStart(),
+  );
+
+  const shellSuggestions = $derived.by(() => {
+    if (typedShell === null) return [];
+    const token = typedShell.toLowerCase();
+    return shellHistory
+      .map((command) => ({ command, rank: shellRank(command, token) }))
+      .filter((match): match is { command: string; rank: number } => match.rank !== null)
+      .sort((left, right) => left.rank - right.rank)
+      .map(({ command }) => command);
+  });
+
+  type Entry =
+    | { command: CommandOption; row: null; shell: null }
+    | { command: null; row: ModCompletionRow; shell: null }
+    | { command: null; row: null; shell: string };
 
   const modEntries = $derived<Entry[]>(
-    dismissed || !completions ? [] : completions.rows.map((row) => ({ command: null, row })),
+    dismissed || !completions ? [] : completions.rows.map((row) => ({ command: null, row, shell: null })),
   );
-  const entries = $derived<Entry[]>([...suggestions.map((command) => ({ command, row: null })), ...modEntries]);
+  const entries = $derived<Entry[]>([
+    ...suggestions.map((command) => ({ command, row: null, shell: null })),
+    ...shellSuggestions.map((shell) => ({ command: null, row: null, shell })),
+    ...modEntries,
+  ]);
   const pickable = $derived(argumentFor ? modEntries : entries);
   const active = $derived(pickable.length ? highlighted % pickable.length : 0);
   const current = $derived(pickable[active] ?? null);
@@ -403,13 +452,15 @@
     reopen();
   };
 
+  const entryText = (entry: Entry): string | null =>
+    entry.command ? commandText(entry.command) : entry.shell !== null ? `${SHELL_MARK}${entry.shell}` : null;
+
   const cycle = (step: number, keepFirst = false) => {
     if (!pickable.length) return;
     highlighted = !keepFirst || preview ? (active + step + pickable.length) % pickable.length : active;
-    const entry = pickable[highlighted];
-    const shown = entry.command ? commandText(entry.command) : draft;
-    preview = { from: query, shown };
-    if (entry.command) write(shown);
+    const text = entryText(pickable[highlighted]);
+    preview = { from: query, shown: text ?? draft };
+    if (text !== null) write(text);
   };
 
   const complete = (command: CommandOption) => {
@@ -419,7 +470,15 @@
     if (!takesArguments(command)) onCommand(command);
   };
 
-  const choose = (entry: Entry) => (entry.command ? complete(entry.command) : take(entry.row));
+  const runShell = (command: string) => {
+    preview = null;
+    write("");
+    field?.focus();
+    onShell?.(command);
+  };
+
+  const choose = (entry: Entry) =>
+    entry.command ? complete(entry.command) : entry.shell !== null ? runShell(entry.shell) : take(entry.row);
 
   const pick = (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
@@ -530,7 +589,7 @@
   {#if entries.length}
     <div class="absolute inset-x-0 bottom-full z-40 mb-1.5 max-h-64 {MENU_LIST_CLASS}">
       <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>
-        {#each entries as entry (entry.command ? `/${entry.command.name}` : `+${entry.row.text}`)}
+        {#each entries as entry (entry.command ? `/${entry.command.name}` : entry.row ? `+${entry.row.text}` : `${SHELL_MARK}${entry.shell}`)}
           <button
             type="button"
             use:keepFocus
@@ -555,11 +614,13 @@
               {#if command.description}
                 <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
               {/if}
-            {:else}
+            {:else if entry.row}
               <span class="w-full truncate text-body-md">{entry.row.label}</span>
               {#if entry.row.description}
                 <span class="w-full truncate text-body-sm text-on-surface-variant">{entry.row.description}</span>
               {/if}
+            {:else}
+              <span class="w-full truncate font-mono text-body-md">{entry.shell}</span>
             {/if}
           </button>
         {/each}
@@ -641,7 +702,9 @@
             onscroll={(event) => (fieldScroll = event.currentTarget.scrollTop)}
             rows="1"
             placeholder={listening ? t("VOICE_LISTENING") : (ghost ?? t("TYPE_MESSAGE"))}
-            class="field-auto no-scrollbar relative block max-h-36 w-full resize-none bg-transparent caret-accent outline-none placeholder:text-faint {FIELD_TEXT} {ghost &&
+            class="field-auto no-scrollbar relative block max-h-36 w-full resize-none bg-transparent caret-accent outline-none placeholder:text-faint {FIELD_TEXT} {shellMode
+              ? 'font-mono'
+              : ''} {ghost &&
             !draft &&
             !listening
               ? 'pr-16'
@@ -698,6 +761,9 @@
             {/if}
             <MenuItem icon={Paperclip} text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => pickFrom()} />
             <MenuItem icon={SquareSlash} text={t("COMMANDS")} onclick={openCommands} />
+            {#if shellAvailable}
+              <MenuItem icon={SquareTerminal} text={t("SHELL_COMMAND")} onclick={openShell} />
+            {/if}
           </PopupMenu>
         {/if}
 

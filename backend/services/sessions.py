@@ -30,6 +30,9 @@ _COMMAND_META_RE = re.compile(r"<command-(name|message|args)>|<local-command-std
 _UNSELECTABLE_RE = re.compile(r"<(?:local-command-stderr|bash-stdout|bash-stderr|task-notification|tick)>")
 _SYSTEM_PROMPT = "system"
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
+_SHELL_INPUT_RE = re.compile(r"^<bash-input>([\s\S]*?)</bash-input>")
+_SHELL_INPUT = "<bash-input>"
+_SHELL_OUTPUT = "<bash-stdout>"
 _COMPACT_MARK = b'"compact_boundary"'
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 
@@ -63,7 +66,7 @@ def record_prompt_history(cwd: str, session_id: str, text: str):
         return
     path = _base().parent / "history.jsonl"
     entry = {
-        "display": text,
+        "display": shown_prompt(text),
         "pastedContents": {},
         "timestamp": int(time.time() * 1000),
         "project": cwd,
@@ -488,7 +491,7 @@ def _session_meta(path: Path) -> tuple[Optional[str], Optional[str], Optional[st
             if not _COMMAND_META_RE.search(text):
                 has_content = True
                 if preview is None and text:
-                    preview = text[:120]
+                    preview = shown_prompt(text)[:120]
     return cwd, preview, title or ai_title, color, entrypoint, has_content
 
 
@@ -645,6 +648,24 @@ async def name_untitled(project_key: str, session_id: str, account: str = "") ->
         return
     await asyncio.to_thread(_append_entry, file, _meta_entry("ai-title", title, session_id))
     await hub.resync()
+
+
+def shown_prompt(text: str) -> str:
+    """A prompt as a list shows it: a `!` command is the line that was typed."""
+    found = _SHELL_INPUT_RE.match(text)
+    return f"!{found.group(1).strip()}" if found else text
+
+
+def _joined_shell_output(messages: list[dict], role: str, text: str) -> bool:
+    """Append the output the CLI writes as its own entry to the `!` command just before it."""
+    last = messages[-1] if messages else None
+    if role != "user" or not text.startswith(_SHELL_OUTPUT) or not last or last.get("role") != "user":
+        return False
+    previous = last.get("text") or ""
+    if not previous.startswith(_SHELL_INPUT) or _SHELL_OUTPUT in previous:
+        return False
+    last["text"] = previous + text
+    return True
 
 
 def _clean_title(raw: str) -> str:
@@ -1281,7 +1302,8 @@ def _points_of(entries: list[dict]) -> list[dict]:
             ).strip()
         else:
             continue
-        if not text or _COMMAND_META_RE.search(text) or _UNSELECTABLE_RE.search(text) or _INTERRUPT_RE.match(text):
+        unselectable = _UNSELECTABLE_RE.search(text) and not text.startswith(_SHELL_INPUT)
+        if not text or _COMMAND_META_RE.search(text) or unselectable or _INTERRUPT_RE.match(text):
             continue
         if entry.get("promptSource") == _SYSTEM_PROMPT or last_anchor is None:
             continue
@@ -1921,7 +1943,8 @@ def _normalize(
         if isinstance(content, str):
             text = content.strip()
             text, notifs = _split_notifications(text)
-            if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
+            joined = _joined_shell_output(messages, role, text)
+            if text and not joined and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
                 messages.append({"type": "text", "role": role, "text": text})
             messages.extend(_once(notifs))
             continue

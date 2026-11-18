@@ -859,6 +859,10 @@ a > .md-link-icon:last-child {
   background: none;
 }
 
+[data-code-block] pre {
+  overscroll-behavior-y: auto;
+}
+
 .markdown blockquote {
   display: flex;
   flex-direction: column;

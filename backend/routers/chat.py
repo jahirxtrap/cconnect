@@ -29,7 +29,7 @@ from services import chat_list
 from services import cli_info
 from services import rewind as rewind_service
 from services import sessions as sessions_service
-from services import settings_store, visibility
+from services import settings_store, shell_commands, visibility
 from services import todos as todos_store
 from services import usage
 from services.claude_runtime import run_prompt
@@ -84,6 +84,9 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
 
     def factory(ask_user, emit):
         async def one(text, attachments, seed_id, drain, request_compact, adopted=False):
+            command = shell_commands.pending_command(text)
+            if command is not None:
+                text = await session.run_shell(command)
             fresh = state.session_id is None
             compacted = False
             is_compact_cmd = text.strip() == "/compact" or text.strip().startswith("/compact ")
@@ -386,7 +389,13 @@ async def _send_mod_reply(send, session, rid: int, work):
 
 def _rejected(raw, reason: str) -> dict:
     request = raw.get("type") if isinstance(raw, dict) else None
-    return {"type": "rejected", "request": request if isinstance(request, str) else None, "message": reason}
+    mid = raw.get("id") if isinstance(raw, dict) else None
+    return {
+        "type": "rejected",
+        "request": request if isinstance(request, str) else None,
+        "id": mid if isinstance(mid, str) else None,
+        "message": reason,
+    }
 
 
 def _invalid(exc: ValidationError) -> str:
@@ -537,7 +546,11 @@ async def chat_ws(ws: WebSocket):
                 target = registry.get(msg.channel) if msg.channel and msg.channel != session.channel else session
                 if target is None:
                     continue
-                target.unlocked = key_matches(msg.security_key or "")
+                unlocked = key_matches(msg.security_key or "")
+                if not unlocked and shell_commands.pending_command(msg.text) is not None:
+                    await send(_rejected(raw, "a ! command needs the security key"))
+                    continue
+                target.unlocked = unlocked
                 seen["capabilities"] = authorize(seen["offered"], msg.security_key)
                 if target.running:
                     if not await target.enqueue(msg.id, msg.text, msg.attachments) and msg.id and target.already_consumed(msg.id):

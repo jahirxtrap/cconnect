@@ -9,11 +9,13 @@
   interface Props {
     code: string;
     lang?: string | null;
+    capped?: boolean;
   }
 
-  const { code, lang }: Props = $props();
+  const { code, lang, capped = false }: Props = $props();
 
   const PRE_CLASS = "px-2.5 py-2 font-mono text-body-sm";
+  const CAPPED_CLASS = "max-h-72 overflow-y-auto";
   const LINE_STYLE = "line-height: var(--chat-line-code)";
 
   const feedback = new CopyFeedback();
@@ -68,7 +70,7 @@
   <pre
     use:hscrollbar={{ touchIndicator: true }}
     style={LINE_STYLE}
-    class="{HSCROLL_CLASS} {PRE_CLASS}">{@render source()}</pre>
+    class="{HSCROLL_CLASS} {PRE_CLASS} {capped ? CAPPED_CLASS : ''}">{@render source()}</pre>
 </div>
 
 {#snippet source()}<code>{#if html}{@html html}{:else}{body}{/if}</code>{/snippet}

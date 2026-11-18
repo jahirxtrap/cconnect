@@ -1,5 +1,6 @@
 <script lang="ts">
   import { readableText } from "$lib/data/pickedElements";
+  import { promptLine } from "$lib/data/shellPrompt";
   import { t } from "$lib/i18n/index.svelte";
   import type { RewindPoint, RewindPreview } from "$lib/services/sessionsApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -125,7 +126,7 @@
         <div class="flex flex-col gap-2 pb-2">
           {#each ordered as point (point.id)}
             <CardPanel onclick={() => onSelect(point)} class="w-full text-left">
-              <p class="line-clamp-2 text-body-md">{readableText(point.text) || point.id}</p>
+              <p class="line-clamp-2 text-body-md">{readableText(promptLine(point.text)) || point.id}</p>
             </CardPanel>
           {/each}
           {#if earlier}

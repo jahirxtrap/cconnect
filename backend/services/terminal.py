@@ -62,6 +62,19 @@ def _write(proc, data: bytes) -> None:
 
 
 _WINDOWS_SHELLS = (("pwsh", "-NoLogo"), ("powershell", "-NoLogo"))
+_LINE_VAR = "CCONNECT_SHELL_LINE"
+_FOLDER_VAR = "CCONNECT_SHELL_FOLDER"
+_POWERSHELL_LINE = (
+    "-NonInteractive",
+    "-Command",
+    "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $global:LASTEXITCODE = 0; $Error.Clear(); "
+    f"try {{ Invoke-Expression $env:{_LINE_VAR} }} finally {{ "
+    f"[System.IO.File]::WriteAllText($env:{_FOLDER_VAR}, (Get-Location).ProviderPath) }}; "
+    "if ($LASTEXITCODE) { exit $LASTEXITCODE }; if ($Error.Count) { exit 1 }",
+)
+_POSIX_LINE = ("-c", f"trap 'pwd > \"${_FOLDER_VAR}\"' EXIT; eval \"${_LINE_VAR}\"")
+_POWERSHELLS = ("pwsh", "powershell")
+_POSIX_SHELLS = ("sh", "bash", "dash", "zsh", "ksh", "mksh", "ash")
 
 
 def _shell() -> list[str]:
@@ -76,6 +89,20 @@ def _shell() -> list[str]:
         if found:
             return [found, *args]
     return [os.environ.get("COMSPEC") or "cmd.exe"]
+
+
+def one_shot(command: str, folder_file: str) -> tuple[list[str], dict[str, str]]:
+    """The terminal's shell set to run one command line in UTF-8 and write the folder it ends in to a file."""
+    shell = _shell()
+    name = Path(shell[0]).stem.lower()
+    passed = {_LINE_VAR: command, _FOLDER_VAR: folder_file}
+    if name in _POWERSHELLS:
+        return [*shell, *_POWERSHELL_LINE], passed
+    if name in _POSIX_SHELLS:
+        return [*shell, *_POSIX_LINE], passed
+    if name == "cmd":
+        return [*shell, "/d", "/s", "/c", f"chcp 65001 >nul & {command}"], {}
+    return [*shell, "-c", command], {}
 
 
 class Terminal:

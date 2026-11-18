@@ -151,6 +151,8 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "remote_control", label: "REMOTE_CONTROL", summary: "REMOTE_CONTROL_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "privacy" },
   { id: "co_authored", label: "CO_AUTHORED", summary: "CO_AUTHORED_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "privacy" },
   { id: "session_upload", label: "SESSION_UPLOAD", summary: "SESSION_UPLOAD_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "privacy" },
+  { id: "data_sharing", label: "DATA_SHARING", summary: "DATA_SHARING_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "privacy" },
+  { id: "error_reports", label: "ERROR_REPORTS", summary: "ERROR_REPORTS_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "privacy" },
 
   { id: "visibility", label: "VISIBILITY", summary: "VISIBILITY_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "simple_mode", label: "SIMPLE_MODE", summary: "SIMPLE_MODE_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },

@@ -138,6 +138,7 @@ class PermissionMode(Event):
 class Rejected(Event):
     type: Literal["rejected"]
     request: Optional[str] = None
+    id: Optional[str] = None
     message: str
 
 
@@ -593,6 +594,17 @@ class Dequeued(Event):
     consumed: int = 0
 
 
+class ShellOutput(Event):
+    type: Literal["shell_output"]
+    stream: Literal["stdout", "stderr"]
+    text: str
+
+
+class ShellExit(Event):
+    type: Literal["shell_exit"]
+    prompt: str
+
+
 class HistoryChunk(Event):
     type: Literal["history_chunk"]
     session_id: str
@@ -651,7 +663,7 @@ ChatEvent = Annotated[
         Reloaded, Agent, TaskRunning, TaskProgress, AgentResult, ThinkingTokens, Hook, Notification, Notice, Mods, Commands,
         ModToast, ModInvalidate, ModTree, ModReply, ModRequest, ModFocus, ModScroll, SessionMessage,
         PluginMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
-        Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, HistoryChunk, Tail,
+        Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, ShellOutput, ShellExit, HistoryChunk, Tail,
         InteractionRequest, InteractionResolved, Pong,
     ],
     Field(discriminator="type"),
