@@ -1,7 +1,6 @@
-- Claude can answer with a drawing once you turn on Drawings in replies in Tools: a checklist, a diagram or a sketch that grows in the reply as it writes and opens large like an image, with Save, Share and Save to Shared
-- An HTML page you browse inside, through its tabs or links, closes with Back on the first tap, also after opening something from its menu
-- A message stopped by a hook ends the turn instead of leaving the chat working until you interrupt it
-- Chats use the full width by default, a phone connecting over Wi-Fi or Tailscale shows its name while it connects, and check_progress starts turned off in Tools
+- Start a message with `!` to run a shell command on the PC: the output shows in your message and Claude answers it, the menu offers the commands you already ran in that chat, and a `cd` carries over to the next ones
+- Privacy in the Server settings chooses how much the Claude CLI sends to Anthropic, Full, No telemetry or Essential only, and whether it sends its error reports
+- Pasting an image works in the Linux app, hooks of background agents show inside their agent instead of in the chat, the Compacted block no longer shows the list of tools meant for Claude, and a chat no longer stays working once Claude's reply has ended
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
