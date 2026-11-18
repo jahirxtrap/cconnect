@@ -5332,6 +5332,10 @@
             }
           ],
           "default": null
+        },
+        "unlocked": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [

@@ -514,6 +514,7 @@ async def chat_ws(ws: WebSocket):
                     "committed_count": committed,
                     "queued": session.queued_items(),
                     "agent": session.state.agent,
+                    "unlocked": key_matches(msg.security_key or ""),
                 })
                 if session.agent is not None:
                     await sink({**session.agent.snapshot(), "channel": session.channel})

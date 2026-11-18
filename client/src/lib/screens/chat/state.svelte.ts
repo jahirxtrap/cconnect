@@ -727,12 +727,11 @@ export class ChatState {
   }
 
   get shellAvailable(): boolean {
-    const gated = this.capabilities?.gated ?? false;
-    return (
-      !this.agent &&
-      !!this.workingPath &&
-      (!gated || (!!securityKeys.keyFor(this.environment) && securityKeys.unlocked(this.environment) !== false))
-    );
+    return !this.agent && !!this.workingPath;
+  }
+
+  get shellLocked(): boolean {
+    return (this.capabilities?.gated ?? false) && securityKeys.unlocked(this.environment) !== true;
   }
 
   runShell(line: string) {

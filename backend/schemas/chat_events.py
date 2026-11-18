@@ -128,6 +128,7 @@ class Ready(Event):
     committed_count: Optional[int] = None
     queued: list[QueuedItem]
     agent: Optional[str] = None
+    unlocked: bool = False
 
 
 class PermissionMode(Event):

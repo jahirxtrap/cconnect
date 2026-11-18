@@ -691,6 +691,7 @@
           command.requireConfirmation ? (confirmCommand = command) : chat.runCommand(command)}
         onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}
         shellAvailable={!chat.sideOpen && chat.shellAvailable}
+        shellLocked={chat.shellLocked}
         shellHistory={chat.shellHistory}
         onShell={(command) => chat.runShell(command)}
         onAttach={chat.sideOpen ? null : (files) => chat.addAttachments(files)}

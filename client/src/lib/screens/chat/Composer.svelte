@@ -81,6 +81,7 @@
     band?: Snippet;
     column?: boolean;
     shellAvailable?: boolean;
+    shellLocked?: boolean;
     shellHistory?: string[];
     onShell?: ((command: string) => void) | null;
   }
@@ -118,6 +119,7 @@
     controls,
     band,
     shellAvailable = false,
+    shellLocked = false,
     shellHistory = [],
     onShell = null,
   }: Props = $props();
@@ -159,7 +161,8 @@
   const shellMode = $derived(shellAvailable && draft.startsWith(SHELL_MARK));
   const shellLine = $derived(draft.slice(SHELL_MARK.length));
   const canSubmit = $derived(
-    !blocked && (shellMode ? !!shellLine.trim() : !!draft.trim() || attachments.length > 0 || elements.length > 0),
+    !blocked &&
+      (shellMode ? !shellLocked && !!shellLine.trim() : !!draft.trim() || attachments.length > 0 || elements.length > 0),
   );
   const chipped = $derived(attachments.length > 0 || elements.length > 0);
   const busy = $derived(streaming || uploading);
@@ -472,8 +475,12 @@
 
   const runShell = (command: string) => {
     preview = null;
-    write("");
     field?.focus();
+    if (shellLocked) {
+      write(`${SHELL_MARK}${command}`);
+      return;
+    }
+    write("");
     onShell?.(command);
   };
 

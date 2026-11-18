@@ -417,6 +417,7 @@ export class ChatSocket {
   #channel: string | null = null;
   #lastSeq = 0;
   #unansweredStarts = 0;
+  #startKey = "";
   #abandonedStarts = 0;
   #sideChannel: string | null = null;
   #sideLastSeq = 0;
@@ -503,6 +504,7 @@ export class ChatSocket {
   }
 
   sendStart(options: StartOptions) {
+    this.#startKey = securityKeys.keyFor(this.profile());
     const sent = this.#send({
       type: "start",
       cwd: options.cwd,
@@ -519,7 +521,7 @@ export class ChatSocket {
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
       capabilities: CLIENT_CAPABILITIES,
-      security_key: securityKeys.current || undefined,
+      security_key: this.#startKey || undefined,
       ...(this.#sideChannel ? { side_channel: this.#sideChannel, side_last_seq: this.#sideLastSeq } : {}),
       ...(this.#sideResume ? { side_resume: this.#sideResume } : {}),
     });
@@ -537,7 +539,7 @@ export class ChatSocket {
       ...(attachments.length ? { attachments } : {}),
       ...(id ? { id } : {}),
       ...(channel ? { channel } : {}),
-      security_key: securityKeys.current || undefined,
+      security_key: securityKeys.keyFor(this.profile()) || undefined,
     });
   }
 
@@ -731,6 +733,7 @@ export class ChatSocket {
     if (event.type === "rejected" && event.request === "start" && !this.#answersCurrentStart()) return;
     if (event.type === "ready") {
       if (!this.#answersCurrentStart()) return;
+      securityKeys.judge(this.profile(), this.#startKey, event.unlocked === true);
       const channel = event.channel ?? null;
       if (channel && channel !== this.#channel) {
         this.#channel = channel;

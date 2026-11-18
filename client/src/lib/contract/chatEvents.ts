@@ -90,6 +90,7 @@ export interface Ready {
   committed_count?: number | null;
   queued: QueuedItem[];
   agent?: string | null;
+  unlocked?: boolean;
 }
 export interface QueuedItem {
   id?: string | null;
