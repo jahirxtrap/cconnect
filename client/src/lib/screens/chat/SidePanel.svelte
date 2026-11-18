@@ -152,9 +152,9 @@
   bind:this={surface}
   aria-hidden="true"
   transition:slide={{ duration: instant ? 0 : PANEL_MS }}
-  class="pointer-events-none absolute inset-x-0 z-10 shadow-float {glass ? (layout.mobile ? '' : 'glass-panel') : 'bg-background'} {motion &&
+  class="pointer-events-none absolute inset-x-0 z-10 -mt-px border-t border-outline-variant {glass ? (layout.mobile ? '' : 'glass-panel') : 'bg-background'} {motion &&
     `transition-[top] ${motion}`}"
-  style="top: {PERCENT - shown}%; bottom: calc({reach} * -1); transform: translateY({drop}px); clip-path: inset(-100% 0 0 0); border-top-left-radius: calc(var(--radius-dock) * {corner}); border-top-right-radius: calc(var(--radius-dock) * {corner}); {glass &&
+  style="top: {PERCENT - shown}%; bottom: calc({reach} * -1); transform: translateY({drop}px); border-top-left-radius: calc(var(--radius-dock) * {corner}); border-top-right-radius: calc(var(--radius-dock) * {corner}); {glass &&
   layout.mobile
     ? 'background-color: var(--c-panel-bg)'
     : ''}"

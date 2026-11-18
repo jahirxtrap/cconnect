@@ -17,3 +17,14 @@ export const pastedName = (file: File): File =>
   GENERIC.test(file.name)
     ? new File([file], `pasted-${randomId()}.${extensionOf(file)}`, { type: file.type })
     : file;
+
+export const clipboardFiles = (data: DataTransfer | null): File[] => {
+  const files = Array.from(data?.files ?? []);
+  const found = files.length
+    ? files
+    : Array.from(data?.items ?? [])
+        .filter((item) => item.kind === "file")
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null);
+  return found.map(pastedName);
+};

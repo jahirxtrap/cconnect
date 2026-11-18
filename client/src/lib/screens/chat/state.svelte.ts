@@ -108,6 +108,13 @@ const fileChangeFields = (event: EventOf<"file_change">): Partial<ChatMessage> =
   labelOnly: event.labelOnly,
 });
 
+const hookFields = (event: EventOf<"hook">): Partial<ChatMessage> => ({
+  text: event.text,
+  toolName: joined(event.event, event.matcher),
+  result: event.level,
+  labelOnly: !event.text,
+});
+
 const compactOf = ({ trigger, preTokens, postTokens, summary }: CompactData): CompactData => ({
   trigger,
   preTokens,
@@ -197,7 +204,7 @@ const matchKey = (item: ChatMessage): string | null => {
   const text = item.text.trim();
   return text ? `${item.role}:${text}` : null;
 };
-const AGENT_CHILD_ROLES: Role[] = ["thinking", "assistant", "tool", "file_change"];
+const AGENT_CHILD_ROLES: Role[] = ["thinking", "assistant", "tool", "file_change", "hook"];
 
 const PREVIEW_LENGTH = 120;
 const NOTIFICATION_BODY_LENGTH = 120;
@@ -2334,6 +2341,8 @@ export class ChatState {
         return [...children, newMessage(this.#nextId++, "tool", toolFields(event))];
       case "file_change":
         return [...children, newMessage(this.#nextId++, "file_change", fileChangeFields(event))];
+      case "hook":
+        return [...children, newMessage(this.#nextId++, "hook", hookFields(event))];
       case "tool_result":
         return event.toolUseId && (event.content !== null || event.failed)
           ? children.map((kid) =>
@@ -2774,14 +2783,7 @@ export class ChatState {
       }
       case "hook":
         this.#breakStream();
-        this.#append(
-          newMessage(this.#nextId++, "hook", {
-            text: event.text,
-            toolName: joined(event.event, event.matcher),
-            result: event.level,
-            labelOnly: !event.text,
-          }),
-        );
+        this.#append(newMessage(this.#nextId++, "hook", hookFields(event)));
         break;
       case "tool_use":
         this.#breakStream();

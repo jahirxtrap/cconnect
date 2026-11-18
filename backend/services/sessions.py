@@ -35,11 +35,13 @@ _SHELL_INPUT = "<bash-input>"
 _SHELL_OUTPUT = "<bash-stdout>"
 _COMPACT_MARK = b'"compact_boundary"'
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
+_REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
 
 _SDK_ENTRYPOINT_RE = re.compile(rb'"entrypoint":"sdk-[A-Za-z]+"')
 _CLI_ENTRYPOINT = b'"entrypoint":"cli"'
 
 _TRAVELLING_TYPES = {"user", "assistant"}
+_SUBAGENT_TYPES = {*_TRAVELLING_TYPES, "attachment"}
 _MEDIA_TYPES = {"image", "document"}
 _TASK_TOOLS = (b"TaskCreate", b"TaskUpdate")
 _request_totals: dict[str, tuple[int, int, int]] = {}
@@ -890,14 +892,19 @@ def _parse_component_result(content: object) -> Optional[dict]:
     }
 
 
+def _without_reminders(text: str) -> str:
+    """Text the CLI writes into the conversation, without the reminders it adds for the model."""
+    return _REMINDER_RE.sub("", text).strip()
+
+
 def _compact_summary_text(entry: dict) -> str:
     """The recap text from an isCompactSummary user entry (string or text blocks)."""
     content = entry.get("message", {}).get("content")
     if isinstance(content, str):
-        return content.strip()
+        return _without_reminders(content)
     if isinstance(content, list):
         parts = [b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"]
-        return "\n".join(p for p in parts if p).strip()
+        return _without_reminders("\n".join(p for p in parts if p))
     return ""
 
 
@@ -1412,7 +1419,8 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
         _FILE_EDIT_TOOLS, _build_file_diff, _errored, _format_tool_input,
         _notebook_cell, _tool_naming, _shown_result,
     )
-    lines = [line for line in _located_lines(sub_file) if line[2].get("type") in _TRAVELLING_TYPES]
+    located = [line for line in _located_lines(sub_file) if line[2].get("type") in _SUBAGENT_TYPES]
+    lines = [line for line in located if line[2].get("type") in _TRAVELLING_TYPES]
     calls.extend(tool_calls.remember_entries(str(sub_file), lines))
     entries = [entry for _, _, entry in lines]
     sub_ms = _tool_durations(entries)
@@ -1428,7 +1436,12 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
                         sub_results[tuid] = block.get("content")
                         sub_errors[tuid] = _errored(block)
     out: list[dict] = []
-    for entry in entries:
+    for _, _, entry in located:
+        if entry.get("type") == "attachment":
+            hook = hook_events.shown(hook_events.from_attachment(entry.get("attachment") or {}), vis["hooks"])
+            if hook:
+                out.append({**hook, "parent": parent_id})
+            continue
         message = entry.get("message", {})
         if message.get("role") != "assistant":
             continue
@@ -1608,7 +1621,7 @@ def _split_notifications(text: str) -> tuple[str, list[dict]]:
         body = match.group(1)
         items.append({"type": "notification", "text": _tag(body, "summary") or "", "result": _tag(body, "status")})
     if items:
-        text = _NOTIFICATION_BLOCK_RE.sub("", text).strip()
+        text = _without_reminders(_NOTIFICATION_BLOCK_RE.sub("", text))
     session_items = [_session_message(match) for match in _SESSION_MESSAGE_RE.finditer(text)]
     if session_items:
         text = _SESSION_MESSAGE_RE.sub("", text).strip()

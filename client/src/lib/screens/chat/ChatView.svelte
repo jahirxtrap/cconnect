@@ -21,7 +21,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
-  import { onNativePaste } from "$lib/platform/pastedContent";
+  import { clipboardImages, onNativePaste } from "$lib/platform/pastedContent";
   import { isPackFile } from "$lib/design/packs/schema";
   import { offerShared } from "$lib/screens/packs/packIntake";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
@@ -82,7 +82,7 @@
   import type { ChatState } from "./state.svelte";
   import { tabs } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
-  import { pastedName } from "$lib/data/pastedFile";
+  import { clipboardFiles } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
 
   interface Props {
@@ -190,31 +190,32 @@
       (layout.mobile && drawer.showing),
   );
 
+  const attachPasted = (files: File[]) => {
+    if (!files.length || !canAttach || dialogOpen) return;
+    chat.addAttachments(files);
+    composer?.focusEnd();
+  };
+
   const onPaste = (event: ClipboardEvent) => {
     if (!focused || event.defaultPrevented) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement) return;
     const data = event.clipboardData;
-    const pasted = Array.from(data?.files ?? []);
-    if (!pasted.length) {
-      for (const item of Array.from(data?.items ?? [])) {
-        if (item.kind !== "file") continue;
-        const file = item.getAsFile();
-        if (file) pasted.push(file);
-      }
-    }
-    const files = pasted.map(pastedName);
+    const files = clipboardFiles(data);
     if (!files.length) {
       const text = data?.getData("text/plain") ?? "";
-      if (!text || dialogOpen || active instanceof HTMLTextAreaElement || (active as HTMLElement | null)?.isContentEditable) return;
+      if (!text) {
+        void clipboardImages().then(attachPasted);
+        return;
+      }
+      if (dialogOpen || active instanceof HTMLTextAreaElement || (active as HTMLElement | null)?.isContentEditable) return;
       event.preventDefault();
       composer?.place(text, "append");
       return;
     }
     if (!canAttach || dialogOpen) return;
     event.preventDefault();
-    chat.addAttachments(files);
-    composer?.focusEnd();
+    attachPasted(files);
   };
 
   $effect(() => {

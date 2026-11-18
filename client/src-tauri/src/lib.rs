@@ -2,6 +2,8 @@
 mod android;
 #[cfg(desktop)]
 mod browser;
+#[cfg(target_os = "linux")]
+mod clipboard;
 mod local_server;
 mod media;
 mod oauth;
@@ -270,6 +272,8 @@ pub fn run() {
             browser::browser_clear_data,
             #[cfg(desktop)]
             browser::browser_data_size,
+            #[cfg(target_os = "linux")]
+            clipboard::clipboard_image,
             #[cfg(target_os = "linux")]
             speech::speech_voices,
             #[cfg(target_os = "linux")]

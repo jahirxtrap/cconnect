@@ -7,6 +7,9 @@ from typing import Any, Optional
 
 WARNING = "warning"
 _TOOL_GATE = "PreToolUse"
+_TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PostToolUseFailure"}
+_HOOK_STARTED = "hook_started"
+_CALL_MESSAGES = ("AssistantMessage", "UserMessage")
 _REFUSED = re.compile(r"^(\w+):\S+ hook error: ")
 _FEEDBACK = re.compile(r"^(\w+) hook feedback:\n")
 _COMMAND_LEAD = re.compile(r"^\[[^\]\n]*\]: ")
@@ -96,3 +99,51 @@ def shown(row: Optional[dict], mode: str) -> Optional[dict]:
     if row is None or mode == "off":
         return None
     return {**row, "text": ""} if mode == "label" else row
+
+
+class HookOwners:
+    """The agent a tool hook ran for: the oldest unanswered call of the tool its live event names."""
+
+    def __init__(self):
+        self._calls: dict[str, tuple[str, Optional[str], set[str]]] = {}
+        self._hooks: dict[str, Optional[str]] = {}
+        self._group: Optional[tuple[str, str, Optional[str]]] = None
+
+    def observe(self, message: Any) -> None:
+        """Follow one streamed message: a tool call, its answer, or a hook that starts."""
+        kind = type(message).__name__
+        data = getattr(message, "data", None)
+        if isinstance(data, dict) and data.get("subtype") == _HOOK_STARTED:
+            self._started(data)
+            return
+        self._group = None
+        blocks = getattr(message, "content", None) if kind in _CALL_MESSAGES else None
+        parent = getattr(message, "parent_tool_use_id", None)
+        for block in blocks if isinstance(blocks, list) else []:
+            block_kind = type(block).__name__
+            if block_kind == "ToolUseBlock" and getattr(block, "id", None):
+                self._calls[block.id] = (getattr(block, "name", "") or "", parent, set())
+            elif block_kind == "ToolResultBlock":
+                self._calls.pop(getattr(block, "tool_use_id", None) or "", None)
+
+    def _started(self, data: dict) -> None:
+        event = data.get("hook_event")
+        name = str(data.get("hook_name") or "")
+        hook_id = data.get("hook_id")
+        if event not in _TOOL_EVENTS or not hook_id or ":" not in name:
+            return
+        tool = name.split(":", 1)[1]
+        if self._group is None or self._group[:2] != (event, tool):
+            claimed = next(
+                (call for call in self._calls.values() if call[0] == tool and event not in call[2]),
+                None,
+            )
+            if claimed is None:
+                return
+            claimed[2].add(event)
+            self._group = (event, tool, claimed[1])
+        self._hooks[hook_id] = self._group[2]
+
+    def owner(self, data: Any) -> Optional[str]:
+        """The agent call a finished hook belongs to, or None for the main conversation."""
+        return self._hooks.pop(data.get("hook_id"), None) if isinstance(data, dict) else None

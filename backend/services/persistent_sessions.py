@@ -13,7 +13,7 @@ from services import control_requests, elicitation, mods, settings_store, visibi
 CLOSE_TIMEOUT = 20.0
 OWN_TURN_TIMEOUT = 300.0
 _MEGABYTE = 1024 * 1024
-_TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
+TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
 
 
 class TurnBinding:
@@ -194,7 +194,7 @@ class PersistentSession:
                 kind = type(message).__name__
                 if kind == "ResultMessage":
                     self._idle.set()
-                elif self.turn is None and kind in _TURN_MESSAGES and not self._own_turn:
+                elif self.turn is None and kind in TURN_MESSAGES and not self._own_turn:
                     self._own_turn = True
                     self._idle.clear()
                     await self._notify({"type": "own_turn"})

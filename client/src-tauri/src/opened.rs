@@ -26,10 +26,20 @@ pub struct Opened {
 }
 
 #[derive(Serialize)]
-pub struct OpenedFile {
+pub struct NativeFile {
     name: String,
     mime: String,
     data: String,
+}
+
+impl NativeFile {
+    pub fn new(name: &str, mime: &str, data: &[u8]) -> Self {
+        Self {
+            name: name.to_string(),
+            mime: mime.to_string(),
+            data: base64::engine::general_purpose::STANDARD.encode(data),
+        }
+    }
 }
 
 fn is_pack(path: &Path) -> bool {
@@ -73,17 +83,13 @@ pub fn opened_links(state: State<'_, Opened>) -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn opened_files(state: State<'_, Opened>) -> Vec<OpenedFile> {
+pub fn opened_files(state: State<'_, Opened>) -> Vec<NativeFile> {
     let paths = state.files.lock().map(|mut held| std::mem::take(&mut *held)).unwrap_or_default();
     paths
         .into_iter()
         .filter_map(|path| {
             let data = std::fs::read(&path).ok()?;
-            Some(OpenedFile {
-                name: path.file_name()?.to_string_lossy().into_owned(),
-                mime: SCHEMA.mime.clone(),
-                data: base64::engine::general_purpose::STANDARD.encode(data),
-            })
+            Some(NativeFile::new(&path.file_name()?.to_string_lossy(), &SCHEMA.mime, &data))
         })
         .collect()
 }

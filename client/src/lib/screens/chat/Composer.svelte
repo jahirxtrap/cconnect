@@ -43,7 +43,7 @@
   import type { Attachment, ComposerElement } from "./state.svelte";
   import { CHAT_COLUMN_CLASS } from "./paneChrome";
   import { TOOLBAR_GAP_CLASS } from "./toolbarChips";
-  import { pastedName } from "$lib/data/pastedFile";
+  import { clipboardFiles } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { MENU_LIST_CLASS, MENU_SCROLL_CLASS } from "$lib/ui/menuSurface";
@@ -566,7 +566,7 @@
   };
 
   const onpaste = (event: ClipboardEvent) => {
-    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
+    const files = clipboardFiles(event.clipboardData);
     if (!files.length || !onAttach) return;
     event.preventDefault();
     onAttach(files);

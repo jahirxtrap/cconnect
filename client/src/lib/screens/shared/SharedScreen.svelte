@@ -96,7 +96,8 @@
   import { recallShared, rememberShared } from "./sharedMemory";
   import { readSharedLocation, syncSharedLocation } from "./sharedUrl";
   import ToolbarAction from "./ToolbarAction.svelte";
-  import { pastedName } from "$lib/data/pastedFile";
+  import { clipboardFiles } from "$lib/data/pastedFile";
+  import { clipboardImages } from "$lib/platform/pastedContent";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { isTouch } from "$lib/platform";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
@@ -884,10 +885,15 @@
 
   const onPaste = (event: ClipboardEvent) => {
     if (!shortcutsEnabled || archive !== null || transfer) return;
-    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
-    if (!files.length) return;
-    event.preventDefault();
-    pendingUploads = files;
+    const files = clipboardFiles(event.clipboardData);
+    if (files.length) {
+      event.preventDefault();
+      pendingUploads = files;
+    } else if (!event.clipboardData?.getData("text/plain")) {
+      void clipboardImages().then((images) => {
+        if (images.length) pendingUploads = images;
+      });
+    }
   };
 
   $effect(() => {

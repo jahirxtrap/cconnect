@@ -1,5 +1,6 @@
 import { decodeBase64 } from "$lib/data/base64";
-import { isDesktop } from "$lib/platform";
+import { pastedName } from "$lib/data/pastedFile";
+import { isDesktop, systemName } from "$lib/platform";
 
 interface NativeFile {
   name: string;
@@ -44,6 +45,16 @@ export const listenNativeFiles = (route: Route) => {
     else deliver(decoded(items));
   };
   if (isDesktop) void openedOnDesktop(route);
+};
+
+export const clipboardImages = async (): Promise<File[]> => {
+  if (!isDesktop || systemName() !== "linux") return [];
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return decoded(await invoke<NativeFile[]>("clipboard_image")).map(pastedName);
+  } catch {
+    return [];
+  }
 };
 
 export const onNativePaste = (handler: (files: File[]) => void): (() => void) => {

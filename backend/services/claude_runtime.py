@@ -871,7 +871,10 @@ async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=Fa
             if message is None:
                 break
             yield message
-            answered = isinstance(message, ResultMessage)
+            if isinstance(message, ResultMessage):
+                answered = True
+            elif type(message).__name__ in persistent_sessions.TURN_MESSAGES:
+                answered = False
             if answered and writer.done():
                 break
     finally:
@@ -1230,6 +1233,7 @@ async def run_prompt(
 
     hidden_tool_ids: set[str] = set()
     tool_started: dict[str, float] = {}
+    hook_owners = hook_events.HookOwners()
     awaiting_cycle = True
     context_tokens: Optional[int] = None
     request_started = time.time()
@@ -1274,6 +1278,7 @@ async def run_prompt(
                     yield {"type": "session_started", "session_id": _msid}
                 current_sid = _msid
             parent = getattr(message, "parent_tool_use_id", None)
+            hook_owners.observe(message)
             agent_mode = vis()["tool_use"] if parent else None
             if parent and agent_mode == "off":
                 continue
@@ -1434,7 +1439,12 @@ async def run_prompt(
                     for event in [*_system_events(subtype, data, vis()), *_drop_pending()]:
                         yield event
                 else:
+                    owner = hook_owners.owner(data) if subtype == "hook_response" else None
+                    if owner and vis()["tool_use"] == "off":
+                        continue
                     for event in _system_events(subtype, data, vis()):
+                        if owner:
+                            event["parent"] = owner
                         yield event
             elif isinstance(message, RateLimitEvent):
                 limits = _rate_limit_event(message.rate_limit_info)
