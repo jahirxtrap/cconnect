@@ -86,6 +86,8 @@ with the tailnet mode or a public one.
 - **Tabs and panels.** Several chats at once, each with its own project and environment; chats and
   ACP agents open in either panel, and the tabs come back when you reopen the app.
 - **Queue.** Send while Claude is still working: messages are held, run in order and survive a reload.
+- **Shell commands.** A message that starts with `!` runs on the PC with the terminal's shell, and
+  Claude reads the output and answers.
 - **Questions as forms.** Claude asks with choices, fields and toggles, and answers with galleries,
   audio, PDFs, live previews and drawings.
 - **Attachments.** Files and photos land on the PC before the prompt runs, and images reach Claude

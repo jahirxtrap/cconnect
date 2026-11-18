@@ -89,8 +89,12 @@ One component owns the viewport for `MessageList` and `SidePanel`, with an expor
 - The composer's ↑/↓ history keeps no list of its own: `userHistory()` is the server's
   `earlier_prompts` (the prompts before the loaded page, sent with every page) followed by the user
   messages on screen and the queue, so it follows paging, Earlier messages, compaction and what
-  other devices send. A long press on Send (`contextmenu`) lists the same history. Send is
-  `aria-disabled`, never `disabled`: a disabled button gets no `contextmenu`.
+  other devices send. A long press on Send (`contextmenu`) lists the same history, and the `!`
+  menu (`shellHistory`) takes its commands from it. Send is `aria-disabled`, never `disabled`: a
+  disabled button gets no `contextmenu`.
+- A `!` command is sent with `chat.send` as a bare `<bash-input>` (`shellInput`). A user row
+  without `<bash-stdout>` is still running (`shellRunOf` gives `code: null`); `shell_output` fills
+  that row's `shell` and `shell_exit` swaps in the prompt the CLI got.
 
 ## Panels (`screens/chat/panes.svelte.ts`)
 

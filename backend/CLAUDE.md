@@ -174,6 +174,8 @@ format is not a contract; what currently holds:
   `custom-title`, `mode`, `last-prompt`…) by type, never by position.
 - A message from another Claude session is a meta `user` entry with `origin.kind: "peer"`; it is
   read from `origin` (`name`, `body`) live and on resume, never from the text around it.
+- `<system-reminder>` blocks are for the model: `_without_reminders` drops them from compaction
+  summaries and from what is left around a task notification, never from what the user typed.
 - A block a tool emits live when it runs (shared files, a pack export) is rebuilt
   only when its call answered without an error (`_ran`), so a call a hook refused shows nothing on
   resume either. Tools mark their failures with `reply(..., error=True)`.
@@ -193,6 +195,13 @@ The turn's own prompt is handed over with a `uuid` like the drained ones, and th
 that arrives before the replay belongs to a turn the CLI ran first on its own (a new CLI's
 "didn't finish before the previous session ended" notice), so the turn goes on; ending there
 left the prompt to arrive as a `tail` and the sender saw it twice.
+
+A `!` command is a prompt holding only `<bash-input>…</bash-input>` (`shell_commands.pending_command`),
+refused at the socket without the key. It goes through the same queue and runs when its turn
+starts (`LiveSession.run_shell`, events `shell_output` / `shell_exit`), and the CLI gets the
+composed prompt. `drain` never hands one over mid-turn: it puts it back at the head and lets the
+turn end once the CLI is settled, so what follows keeps its order. The shell folder a `cd` leaves
+lives in the `LiveSession`.
 
 ## Persistent sessions and mods
 
