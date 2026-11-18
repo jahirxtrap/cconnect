@@ -212,6 +212,7 @@
   let addingMarket = $state(false);
   let catalogSource = $state.raw<CatalogSource | null>(null);
   let catalog = $state<CatalogEntry[] | null>(null);
+  let catalogLoading = $state(false);
   let catalogQuery = $state("");
   let marketPicker = $state(false);
   let updatingMarkets = $state(false);
@@ -394,11 +395,14 @@
   };
 
   const openCatalog = async (source: CatalogSource) => {
+    if (!catalogSource) catalog = null;
     catalogSource = source;
-    catalog = null;
     catalogQuery = "";
+    catalogLoading = true;
     const list = await catalogOf(source);
-    if (catalogSource === source) catalog = list;
+    if (catalogSource !== source) return;
+    catalog = list;
+    catalogLoading = false;
   };
 
   const browse = () => {
@@ -1251,7 +1255,7 @@
 
 {#if catalogSource}
   {@const source = catalogSource}
-  <CompactDialog title={catalogTitle(source)} onDismiss={() => (catalogSource = null)}>
+  <CompactDialog title={catalogTitle(source)} onDismiss={() => (catalogSource = null)} fullHeight>
     {#snippet titleTrailing()}
       {#if source.kind !== "chats"}
         <TooltipIconButton
@@ -1334,10 +1338,14 @@
           {/snippet}
         </ListRow>
       {:else}
-        <EmptyState text={t(extensions?.chatMods.length ? "NO_RESULTS" : "CHAT_MODS_EMPTY")} class="py-8" />
+        <EmptyState text={t(extensions?.chatMods.length ? "NO_RESULTS" : "CHAT_MODS_EMPTY")} class="h-full" />
       {/each}
     {:else if !catalog}
-      <CenteredProgress class="py-6" />
+      {#if catalogLoading}
+        <CenteredProgress class="h-full" />
+      {:else}
+        <EmptyState text={t(serverStatus.unavailable ? "SERVER_UNAVAILABLE" : "CONNECTION_ERROR")} class="h-full" />
+      {/if}
     {:else}
       {#each filteredCatalog as entry (`${entry.marketplace}/${entry.name}`)}
         <ListRow
@@ -1360,7 +1368,7 @@
           {/snippet}
         </ListRow>
       {:else}
-        <EmptyState text={t("NO_RESULTS")} class="py-8" />
+        <EmptyState text={t("NO_RESULTS")} class="h-full" />
       {/each}
     {/if}
   </CompactDialog>

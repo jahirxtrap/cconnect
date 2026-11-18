@@ -102,6 +102,7 @@
   title={t("AGENTS")}
   header={busy ? progress : undefined}
   {onDismiss}
+  fullHeight
 >
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>

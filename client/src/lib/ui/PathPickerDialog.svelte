@@ -60,7 +60,7 @@
   const target = $derived(mode === "file" ? picked : (listing?.path ?? null));
 </script>
 
-<CompactDialog title={t("CHOOSE")} subtitle={listing?.path ?? ""} {onDismiss}>
+<CompactDialog title={t("CHOOSE")} subtitle={listing?.path ?? ""} {onDismiss} fullHeight>
   {#snippet titleTrailing()}
     {#if onUpload}
       <TooltipIconButton label={t("DEVICE_APK_LOCAL")} onclick={() => uploadInput?.click()}>
@@ -77,7 +77,7 @@
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={() => target && onConfirm(target)} enabled={!!target}>{t("CHOOSE")}</Button>
   {/snippet}
-  <div class="flex min-h-[320px] flex-col">
+  <div class="flex min-h-full flex-col">
     {#if loading && !listing}
       <CenteredProgress class="flex-1" />
     {:else if listing}

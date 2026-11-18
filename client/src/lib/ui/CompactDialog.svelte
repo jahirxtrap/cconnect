@@ -24,6 +24,7 @@
     header?: Snippet;
     buttons?: Snippet;
     paged?: boolean;
+    fullHeight?: boolean;
     children?: Snippet;
   }
 
@@ -37,6 +38,7 @@
     header,
     buttons,
     paged = false,
+    fullHeight = false,
     children,
   }: Props = $props();
 
@@ -51,7 +53,9 @@
     <Dialog.Content
       data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-(--dialog-max-height) w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
+      class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex {fullHeight
+        ? 'h-(--dialog-max-height)'
+        : 'h-max max-h-(--dialog-max-height)'} w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
       <div class="flex items-center {titleLeading ? 'gap-3' : ''}">
         {@render titleLeading?.()}
@@ -74,9 +78,9 @@
       {#if children}
         <div
           use:viewportScrollbar
-          class="-mx-5 min-h-0 shrink {paged ? 'flex flex-col' : `overflow-x-clip ${DIALOG_PAGE_CLASS}`} {header
-            ? 'mt-0.5'
-            : 'mt-3'}"
+          class="-mx-5 min-h-0 {fullHeight ? 'flex-1' : 'shrink'} {paged
+            ? 'flex flex-col'
+            : `overflow-x-clip ${DIALOG_PAGE_CLASS}`} {header ? 'mt-0.5' : 'mt-3'}"
         >
           {@render children()}
         </div>

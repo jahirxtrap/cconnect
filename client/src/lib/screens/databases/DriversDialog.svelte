@@ -4,11 +4,13 @@
   import Trash from "@lucide/svelte/icons/trash";
   import { databaseFailureText, engineLabel, type DatabaseEngine } from "$lib/data/databaseModels";
   import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { databases } from "$lib/services/databases.svelte";
   import { createDatabasesApi, type DatabaseOutcome } from "$lib/services/databasesApi";
   import Button from "$lib/ui/Button.svelte";
+  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -40,9 +42,10 @@
   let removing = $state<Driver | null>(null);
 
   const profile = $derived(backend.active);
+  const list = $derived(databases.listOf(profile));
   const drivers = $derived.by(() => {
     const grouped = new Map<string, DatabaseEngine[]>();
-    for (const engine of databases.listOf(profile)?.engines ?? []) {
+    for (const engine of list?.engines ?? []) {
       if (engine.form === "url") continue;
       const key = engine.packages.join(" ") || engine.id;
       grouped.set(key, [...(grouped.get(key) ?? []), engine]);
@@ -80,39 +83,51 @@
   <IconTile icon={Plug} />
 {/snippet}
 
-<CompactDialog title={t("DATABASE_DRIVERS")} header={busy ? progress : undefined} {onDismiss}>
+<CompactDialog title={t("DATABASE_DRIVERS")} header={busy ? progress : undefined} {onDismiss} fullHeight>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
-  <div class="flex w-full flex-col [--page-inset:0px]">
-    {#if failed}
-      <ErrorText text={failed} class="pb-2" />
-    {/if}
-    <SectionHeader label={t("DATABASE_DRIVERS_INSTALLED")} />
-    {#each installed as driver (driver.key)}
-      <ListRow title={driver.title} subtitle={driver.engines} subtitleLines={2} leading={tile}>
-        {#snippet trailing()}
-          {#if driver.engine.packages.length}
-            <TooltipIconButton label={t("UNINSTALL")} enabled={!busy} onclick={() => (removing = driver)}>
-              <Trash />
-            </TooltipIconButton>
-          {/if}
-        {/snippet}
-      </ListRow>
-    {/each}
-    <SectionHeader label={t("DATABASE_DRIVERS_AVAILABLE")} divider />
-    {#each offered as driver (driver.key)}
-      <ListRow title={driver.title} subtitle={driver.engines} subtitleLines={2} leading={tile}>
-        {#snippet trailing()}
-          <TooltipIconButton label={t("INSTALL")} enabled={!busy} onclick={() => void act((key) => api.install(driver.engine.id, key))}>
-            <Download />
-          </TooltipIconButton>
-        {/snippet}
-      </ListRow>
+  {#if !list}
+    {#if databases.failed(profile)}
+      <EmptyState text={t(serverStatus.unavailable ? "SERVER_UNAVAILABLE" : "CONNECTION_ERROR")} class="h-full" />
     {:else}
-      <EmptyState text={t("DATABASE_DRIVERS_AVAILABLE_NONE")} class="py-3" />
-    {/each}
-  </div>
+      <CenteredProgress class="h-full" />
+    {/if}
+  {:else}
+    <div class="flex w-full flex-col [--page-inset:0px]">
+      {#if failed}
+        <ErrorText text={failed} class="pb-2" />
+      {/if}
+      <SectionHeader label={t("DATABASE_DRIVERS_INSTALLED")} />
+      {#each installed as driver (driver.key)}
+        <ListRow title={driver.title} subtitle={driver.engines} subtitleLines={2} leading={tile}>
+          {#snippet trailing()}
+            {#if driver.engine.packages.length}
+              <TooltipIconButton label={t("UNINSTALL")} enabled={!busy} onclick={() => (removing = driver)}>
+                <Trash />
+              </TooltipIconButton>
+            {/if}
+          {/snippet}
+        </ListRow>
+      {/each}
+      <SectionHeader label={t("DATABASE_DRIVERS_AVAILABLE")} divider />
+      {#each offered as driver (driver.key)}
+        <ListRow title={driver.title} subtitle={driver.engines} subtitleLines={2} leading={tile}>
+          {#snippet trailing()}
+            <TooltipIconButton
+              label={t("INSTALL")}
+              enabled={!busy}
+              onclick={() => void act((key) => api.install(driver.engine.id, key))}
+            >
+              <Download />
+            </TooltipIconButton>
+          {/snippet}
+        </ListRow>
+      {:else}
+        <EmptyState text={t("DATABASE_DRIVERS_AVAILABLE_NONE")} class="py-3" />
+      {/each}
+    </div>
+  {/if}
 </CompactDialog>
 
 {#if removing}
