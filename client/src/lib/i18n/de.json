@@ -1250,6 +1250,7 @@
   "HIDE": "Ausblenden",
   "TRANSFERS_ACTIVE": "{1} von {2} wird übertragen",
   "TRANSFERS_DONE": "Übertragungen abgeschlossen",
+  "TRANSFERS_CLOSE_CONFIRM": "Übertragungen schließen? Was gerade läuft, wird beendet.",
   "EXPAND": "Ausklappen",
   "COLLAPSE": "Einklappen",
   "CONTEXT_USAGE": "Kontextnutzung",

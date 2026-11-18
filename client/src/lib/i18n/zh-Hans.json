@@ -1250,6 +1250,7 @@
   "HIDE": "隐藏",
   "TRANSFERS_ACTIVE": "正在传输 {1}/{2}",
   "TRANSFERS_DONE": "传输完成",
+  "TRANSFERS_CLOSE_CONFIRM": "关闭传输？正在进行的内容将停止。",
   "EXPAND": "展开",
   "COLLAPSE": "折叠",
   "CONTEXT_USAGE": "上下文用量",

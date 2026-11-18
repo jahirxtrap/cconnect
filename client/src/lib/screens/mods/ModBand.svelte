@@ -7,6 +7,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { holdFocus, keepTyping, typingOnTouch } from "$lib/ui/keepFocus";
+  import { TOGGLE_MS } from "$lib/ui/motion";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import ModInline from "./ModInline.svelte";
   import ModSite from "./ModSite.svelte";
@@ -59,7 +60,6 @@
 
   const BAND_ROWS = 8;
   const CARD_INSET = "0.875rem";
-  const TOGGLE_MS = 200;
   const HINT_ID = "prompt-hint";
   const MODE_ID = "session-mode";
   const MODE_JOIN = " & ";

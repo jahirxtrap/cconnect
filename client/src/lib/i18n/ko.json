@@ -1250,6 +1250,7 @@
   "HIDE": "숨기기",
   "TRANSFERS_ACTIVE": "{2}개 중 {1}번째 전송 중",
   "TRANSFERS_DONE": "전송 완료",
+  "TRANSFERS_CLOSE_CONFIRM": "전송을 닫으시겠습니까? 진행 중인 작업이 중지됩니다.",
   "EXPAND": "펼치기",
   "COLLAPSE": "접기",
   "CONTEXT_USAGE": "컨텍스트 사용량",

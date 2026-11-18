@@ -1,6 +1,9 @@
+import { store } from "$lib/platform/storage";
 import { backend, type Profile } from "$lib/services/backend.svelte";
 import type { ClashPolicy } from "$lib/services/sharedApi";
 import { uploadAttachment } from "$lib/services/uploadApi";
+
+const COLLAPSED_KEY = "transfers.collapsed";
 
 export type TransferKind = "upload" | "download";
 export type TransferStatus = "active" | "done" | "failed";
@@ -24,12 +27,21 @@ export interface Transfer {
 
 class TransferManager {
   items = $state<Transfer[]>([]);
-  collapsed = $state(false);
 
+  #collapsed = $state<boolean>(store.get(COLLAPSED_KEY, false));
   #nextId = 0;
   #cancelled = new Set<number>();
   #aborts = new Map<number, AbortController>();
   #progressAt = new Map<number, number>();
+
+  get collapsed() {
+    return this.#collapsed;
+  }
+
+  set collapsed(value: boolean) {
+    this.#collapsed = value;
+    store.set(COLLAPSED_KEY, value);
+  }
 
   get active() {
     return this.items.filter((item) => item.status === "active");
@@ -102,13 +114,11 @@ class TransferManager {
   dismiss() {
     this.items.filter((item) => item.status === "active").forEach((item) => this.cancel(item.id));
     this.items = [];
-    this.collapsed = false;
   }
 
   #start(kind: TransferKind, name: string, dir: string, url = "") {
     const id = ++this.#nextId;
     this.items = [...this.items, { id, kind, name, dir, url, saved: "", progress: 0, status: "active" }];
-    this.collapsed = false;
     return id;
   }
 

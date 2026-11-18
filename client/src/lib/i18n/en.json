@@ -1250,6 +1250,7 @@
   "HIDE": "Hide",
   "TRANSFERS_ACTIVE": "Transferring {1} of {2}",
   "TRANSFERS_DONE": "Transfers complete",
+  "TRANSFERS_CLOSE_CONFIRM": "Close the transfers? Whatever is in progress stops.",
   "EXPAND": "Expand",
   "COLLAPSE": "Collapse",
   "CONTEXT_USAGE": "Context usage",

@@ -1250,6 +1250,7 @@
   "HIDE": "Nascondi",
   "TRANSFERS_ACTIVE": "Trasferimento {1} di {2}",
   "TRANSFERS_DONE": "Trasferimenti completati",
+  "TRANSFERS_CLOSE_CONFIRM": "Chiudere i trasferimenti? Tutto ciò che è in corso si interrompe.",
   "EXPAND": "Espandi",
   "COLLAPSE": "Comprimi",
   "CONTEXT_USAGE": "Utilizzo del contesto",

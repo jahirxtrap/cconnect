@@ -1250,6 +1250,7 @@
   "HIDE": "非表示",
   "TRANSFERS_ACTIVE": "{2} 件中 {1} 件を転送中",
   "TRANSFERS_DONE": "転送が完了しました",
+  "TRANSFERS_CLOSE_CONFIRM": "転送を閉じますか？進行中の処理は停止します。",
   "EXPAND": "展開",
   "COLLAPSE": "折りたたむ",
   "CONTEXT_USAGE": "コンテキスト使用量",

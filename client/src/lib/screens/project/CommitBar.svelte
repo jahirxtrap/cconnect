@@ -15,6 +15,7 @@
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import { PANEL_MS } from "$lib/ui/motion";
   import SelectField from "$lib/ui/SelectField.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
@@ -43,7 +44,6 @@
   }: Props = $props();
 
   const DOT_SIZE = 16;
-  const PANEL_MS = 350;
   const LINE_HEIGHT = 20;
   const MIN_HEIGHT = LINE_HEIGHT * 2;
   const MAX_HEIGHT = LINE_HEIGHT * 16;

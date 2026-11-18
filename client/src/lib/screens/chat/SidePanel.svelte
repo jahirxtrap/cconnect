@@ -5,6 +5,7 @@
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { PANEL_MS } from "$lib/ui/motion";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { BlockExpansion } from "./blockExpansion.svelte";
@@ -134,8 +135,6 @@
     if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
     scroller?.scrollToEnd();
   });
-
-  const PANEL_MS = 350;
 
   const slide = (node: Element, { duration }: { duration: number }) => {
     const from = exitFrom;
