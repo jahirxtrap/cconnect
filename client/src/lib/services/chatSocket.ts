@@ -733,7 +733,7 @@ export class ChatSocket {
     if (event.type === "rejected" && event.request === "start" && !this.#answersCurrentStart()) return;
     if (event.type === "ready") {
       if (!this.#answersCurrentStart()) return;
-      securityKeys.judge(this.profile(), this.#startKey, event.unlocked === true);
+      if (event.unlocked !== undefined) securityKeys.judge(this.profile(), this.#startKey, event.unlocked);
       const channel = event.channel ?? null;
       if (channel && channel !== this.#channel) {
         this.#channel = channel;
