@@ -205,6 +205,7 @@ export type ServerEvent =
   | ({
       type: "interaction_request";
       replay: boolean;
+      awaiting: Contract.InteractionRequest["awaiting"];
       toolName: string | null;
       toolUseId: string | null;
       input: string | null;
@@ -1099,6 +1100,7 @@ export class ChatSocket {
           replay: event.replay === true,
           requestId: event.id ?? "",
           kind: event.kind ?? "permission",
+          awaiting: event.awaiting ?? "permission",
           toolName: event.tool_name ?? null,
           toolUseId: event.tool_use_id ?? null,
           input: event.input ?? null,

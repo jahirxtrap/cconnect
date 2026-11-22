@@ -69,6 +69,22 @@
         "resident": {
           "type": "boolean"
         },
+        "awaiting": {
+          "anyOf": [
+            {
+              "enum": [
+                "permission",
+                "question",
+                "component"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "account": {
           "anyOf": [
             {
@@ -2920,6 +2936,14 @@
         "kind": {
           "type": "string"
         },
+        "awaiting": {
+          "enum": [
+            "permission",
+            "question",
+            "component"
+          ],
+          "type": "string"
+        },
         "tool_name": {
           "anyOf": [
             {
@@ -3099,7 +3123,8 @@
       "required": [
         "type",
         "id",
-        "kind"
+        "kind",
+        "awaiting"
       ],
       "title": "InteractionRequest",
       "type": "object"

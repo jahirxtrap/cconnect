@@ -27,6 +27,8 @@ private const val BATCH_LIMIT = 200
 private const val ACTIVITY = "activity"
 private const val READY = "ready"
 private const val WAITING = "waiting"
+private const val AWAITING = "awaiting"
+private const val DEFAULT_AWAITING = "permission"
 private const val NAME_SLOT = "{1}"
 private const val TAP = "tap"
 private const val EXTRA_SOCKET = "cconnect.notification.socket"
@@ -64,7 +66,7 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
 
   @Volatile private var awake = true
   @Volatile private var doneTitle = ""
-  @Volatile private var waitingTitle = ""
+  @Volatile private var waitingTitles = JSONObject()
   @Volatile private var claudeName = ""
 
   fun onForeground() {
@@ -96,7 +98,7 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   @JavascriptInterface
   fun notifications(done: String, waiting: String, claude: String) {
     doneTitle = done
-    waitingTitle = waiting
+    waitingTitles = runCatching { JSONObject(waiting) }.getOrDefault(JSONObject())
     claudeName = claude
   }
 
@@ -177,19 +179,30 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     val event = runCatching { JSONObject(text) }.getOrNull() ?: return
     when (event.optString("type")) {
       READY -> states[id] = event.optString(ACTIVITY)
-      ACTIVITY -> moved(id, event.optString("state"))
+      ACTIVITY -> moved(id, event.optString("state"), event.optString(AWAITING))
     }
   }
 
-  private fun moved(id: String, now: String) {
+  private fun moved(id: String, now: String, awaiting: String) {
     val before = states.put(id, now).orEmpty()
     val agent = agents[id] ?: return
-    if (!awake) changed(id, "", before, now, agent, subjects[id].orEmpty())
+    if (!awake) changed(id, "", before, now, awaiting, agent, subjects[id].orEmpty())
   }
 
-  private fun changed(socket: String, session: String, before: String, now: String, name: String, body: String) {
-    if (now == WAITING && before != WAITING) notify(socket, session, titled(waitingTitle, name), body)
-    else if (before in BUSY && now !in BUSY && now != WAITING) notify(socket, session, titled(doneTitle, name), body)
+  private fun changed(
+    socket: String,
+    session: String,
+    before: String,
+    now: String,
+    awaiting: String,
+    name: String,
+    body: String,
+  ) {
+    if (now == WAITING && before != WAITING) {
+      notify(socket, session, titled(waitingTitles.optString(awaiting.ifEmpty { DEFAULT_AWAITING }), name), body)
+    } else if (before in BUSY && now !in BUSY && now != WAITING) {
+      notify(socket, session, titled(doneTitle, name), body)
+    }
   }
 
   private fun titled(template: String, name: String) = template.replace(NAME_SLOT, name)
@@ -227,7 +240,7 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     val now = session.optString("activity")
     remember(session)
     if (id !in watched) return
-    changed(socket, id, before, now, claudeName, titles[id].orEmpty())
+    changed(socket, id, before, now, session.optString(AWAITING), claudeName, titles[id].orEmpty())
   }
 
   private fun notify(socket: String, session: String, title: String, body: String) {

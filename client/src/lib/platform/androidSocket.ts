@@ -4,7 +4,7 @@ interface LinkBridge {
   describe: (id: string, subject: string) => void;
   close: (id: string) => void;
   reset: () => void;
-  notifications: (done: string, waiting: string, claude: string) => void;
+  notifications: (done: string, waitingTitles: string, claude: string) => void;
   watched: (ids: string) => void;
 }
 
@@ -96,8 +96,8 @@ export const onSocketTap = (socket: WebSocket, onTap: (session: string) => void)
   if (socket instanceof NativeSocket) socket.ontap = onTap;
 };
 
-export const nativeNotifications = (done: string, waiting: string, claude: string) => {
-  bridge()?.notifications(done, waiting, claude);
+export const nativeNotifications = (done: string, waitingTitles: string, claude: string) => {
+  bridge()?.notifications(done, waitingTitles, claude);
 };
 
 export const nativeWatched = (sessionIds: string[]) => {

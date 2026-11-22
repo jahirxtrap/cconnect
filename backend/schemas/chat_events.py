@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, WithJsonSchema
 
 Unknown = Annotated[Any, WithJsonSchema({"tsType": "unknown"})]
 
+Awaiting = Literal["permission", "question", "component"]
+
 
 class Shape(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -147,6 +149,7 @@ class Activity(Event):
     type: Literal["activity"]
     state: str
     resident: bool
+    awaiting: Optional[Awaiting] = None
     account: Optional[str] = None
 
 
@@ -625,6 +628,7 @@ class InteractionRequest(Event):
     type: Literal["interaction_request"]
     id: str
     kind: str
+    awaiting: Awaiting
     tool_name: Optional[str] = None
     tool_kind: Optional[str] = None
     tool_use_id: Optional[str] = None

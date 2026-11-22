@@ -61,6 +61,7 @@ class ChatListHub:
     def __init__(self):
         self._sessions: dict[str, dict] = {}
         self._activity: dict[str, str] = {}
+        self._awaiting: dict[str, str] = {}
         self._resident: set[str] = set()
         self._hidden: set[str] = set()
         self._projects: dict[str, dict] = {}
@@ -135,7 +136,13 @@ class ChatListHub:
             self._hidden.difference_update(session_ids)
         await self.resync()
 
-    def set_activity(self, session_id: Optional[str], activity: Optional[str], resident: Optional[bool] = None):
+    def set_activity(
+        self,
+        session_id: Optional[str],
+        activity: Optional[str],
+        resident: Optional[bool] = None,
+        awaiting: Optional[str] = None,
+    ):
         if not session_id:
             return
         with self._lock:
@@ -143,6 +150,10 @@ class ChatListHub:
                 self._activity[session_id] = activity
             else:
                 self._activity.pop(session_id, None)
+            if awaiting:
+                self._awaiting[session_id] = awaiting
+            else:
+                self._awaiting.pop(session_id, None)
             if resident is True:
                 self._resident.add(session_id)
             elif resident is False:
@@ -161,10 +172,15 @@ class ChatListHub:
         self._emit([{"type": "session_changed", "session": updated}])
 
     def _with_activity(self, session_id: str, entry: dict) -> dict:
-        updated = {key: value for key, value in entry.items() if key not in ("activity", "resident", "rewind")}
+        updated = {
+            key: value for key, value in entry.items() if key not in ("activity", "awaiting", "resident", "rewind")
+        }
         activity = self._activity.get(session_id)
         if activity:
             updated["activity"] = activity
+        awaiting = self._awaiting.get(session_id)
+        if awaiting:
+            updated["awaiting"] = awaiting
         if session_id in self._resident:
             updated["resident"] = True
         anchor = rewind.get_pending(session_id)
@@ -176,7 +192,12 @@ class ChatListHub:
         from services.live_sessions import registry
 
         live = registry.get_by_session(session_id)
-        self.set_activity(session_id, live.activity if live else None, live.resident_alive if live else False)
+        self.set_activity(
+            session_id,
+            live.activity if live else None,
+            live.resident_alive if live else False,
+            live.awaiting if live else None,
+        )
 
     async def resync(self):
         await asyncio.to_thread(self._refresh, True)

@@ -42,6 +42,12 @@ AGENT_EVENTS = ("agent_state", "history")
 _CLOSE = object()
 
 
+def _awaiting_of(payload):
+    if payload.get("kind") != "component":
+        return "permission"
+    return "question" if payload.get("title_key") == "questions" else "component"
+
+
 def _joinable(last, stamped):
     return (
         last["type"] == stamped["type"]
@@ -167,6 +173,10 @@ class LiveSession:
             return "failed"
         return "persistent" if self._resident is not None and self._resident.connected else None
 
+    @property
+    def awaiting(self):
+        return next((entry["awaiting"] for entry in reversed(self._pending.values())), None)
+
     def wanted(self):
         """What the attached sockets asked to see, so a turn never produces detail
         nobody wants (nor buffers it for replay)."""
@@ -194,7 +204,7 @@ class LiveSession:
                 for running in list(self._background.values()):
                     await self._send_one(sink, {**running, "channel": self.channel, "replay": True})
             await self._send_one(sink, self._mods_snapshot())
-            await self._send_one(sink, self._activity_event(self.activity, self.resident_alive))
+            await self._send_one(sink, self._activity_event(self.activity, self.resident_alive, self.awaiting))
         self._watch_transcript()
 
     def covers(self, last_seq):
@@ -679,35 +689,37 @@ class LiveSession:
 
         session_id = self.state.session_id
         resident = self.resident_alive
+        awaiting = self.awaiting if activity == "waiting" else None
         agent = self.agent
         if self._published_id and self._published_id != session_id:
             hub.set_activity(self._published_id, None, False)
             if agent is not None:
                 agent_watch.activity(agent.agent_id, agent.cwd, self._published_id, None)
         self._published_id = session_id
-        hub.set_activity(session_id, activity, resident)
+        hub.set_activity(session_id, activity, resident, awaiting)
         if agent is not None and session_id:
             agent_watch.activity(agent.agent_id, agent.cwd, session_id, activity)
-        announced = (activity, resident)
+        announced = (activity, resident, awaiting)
         if announced == self._announced:
             return
         self._announced = announced
         try:
-            asyncio.get_running_loop().create_task(self._send_activity(activity, resident))
+            asyncio.get_running_loop().create_task(self._send_activity(activity, resident, awaiting))
         except RuntimeError:
             pass
 
-    def _activity_event(self, activity, resident):
+    def _activity_event(self, activity, resident, awaiting):
         return {
             "type": "activity",
             "state": activity or "idle",
             "resident": resident,
+            "awaiting": awaiting,
             "account": None if self.agent is not None else accounts.resolve(self.state.account),
             "channel": self.channel,
         }
 
-    async def _send_activity(self, activity, resident):
-        payload = self._activity_event(activity, resident)
+    async def _send_activity(self, activity, resident, awaiting):
+        payload = self._activity_event(activity, resident, awaiting)
         for sink in list(self._sinks):
             await self._send_one(sink, payload)
 
@@ -753,11 +765,12 @@ class LiveSession:
         for the answer. The wait lives on the session, so it survives reconnects."""
         rid = uuid.uuid4().hex
         future = asyncio.get_running_loop().create_future()
-        self._pending[rid] = {"future": future, "event": None}
+        awaiting = _awaiting_of(payload)
+        self._pending[rid] = {"future": future, "event": None, "awaiting": awaiting}
         self._publish_activity("waiting")
         try:
             self._pending[rid]["event"] = await self._emit(
-                {"type": "interaction_request", "id": rid, **payload}
+                {"type": "interaction_request", "id": rid, "awaiting": awaiting, **payload}
             )
             return await future
         finally:

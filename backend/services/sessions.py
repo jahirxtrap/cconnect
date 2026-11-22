@@ -1373,6 +1373,10 @@ class _StampedList(list):
                 item.setdefault("parent", self.cur_parent)
         super().append(item)
 
+    def extend(self, items):
+        for item in items:
+            self.append(item)
+
 
 def _thinking_tokens(message: dict) -> Optional[int]:
     """The final thinking count the API reported, more exact than the live estimate."""

@@ -156,7 +156,7 @@ interface SideChat {
   streaming: boolean;
 }
 import { i18n, t } from "$lib/i18n/index.svelte";
-import { notifier } from "$lib/services/notifier.svelte";
+import { AWAITING_TITLES, notifier } from "$lib/services/notifier.svelte";
 import { agents } from "$lib/services/agents.svelte";
 import { createAgentsApi } from "$lib/services/agentsApi";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
@@ -1993,6 +1993,10 @@ export class ChatState {
     void this.#reloadConversation({ keepLive: this.streaming });
   }
 
+  #fromEvent(role: Role, patch: Partial<ChatMessage> = {}): ChatMessage {
+    return newMessage(this.#nextId++, role, { timestamp: this.#eventAt, ...patch });
+  }
+
   #append(item: ChatMessage) {
     this.messages = [...this.messages, ...this.#takeHeld(), item];
     this.#capFromTail(MESSAGE_TAIL_CAP);
@@ -2328,20 +2332,20 @@ export class ChatState {
       case "thinking": {
         const role = event.type === "thinking" ? "thinking" : "assistant";
         if (event.type === "thinking" && event.labelOnly) {
-          return [...children, newMessage(this.#nextId++, "thinking", { labelOnly: true })];
+          return [...children, this.#fromEvent("thinking", { labelOnly: true })];
         }
         if (!event.text) return children;
         if (last?.role === role && !last.labelOnly) {
           return [...children.slice(0, -1), { ...last, text: last.text + event.text, timestamp: this.#eventAt }];
         }
-        return [...children, newMessage(this.#nextId++, role, { text: event.text, timestamp: this.#eventAt })];
+        return [...children, this.#fromEvent(role, { text: event.text })];
       }
       case "tool_use":
-        return [...children, newMessage(this.#nextId++, "tool", toolFields(event))];
+        return [...children, this.#fromEvent("tool", toolFields(event))];
       case "file_change":
-        return [...children, newMessage(this.#nextId++, "file_change", fileChangeFields(event))];
+        return [...children, this.#fromEvent("file_change", fileChangeFields(event))];
       case "hook":
-        return [...children, newMessage(this.#nextId++, "hook", hookFields(event))];
+        return [...children, this.#fromEvent("hook", hookFields(event))];
       case "tool_result":
         return event.toolUseId && (event.content !== null || event.failed)
           ? children.map((kid) =>
@@ -2482,9 +2486,9 @@ export class ChatState {
       }
       return currentId;
     }
-    const id = this.#nextId++;
-    this.#append(newMessage(id, role, { text, timestamp: this.#eventAt }));
-    return id;
+    const message = this.#fromEvent(role, { text });
+    this.#append(message);
+    return message.id;
   }
 
   #updateInteraction(requestId: string, transform: (data: InteractionData) => InteractionData) {
@@ -2637,9 +2641,7 @@ export class ChatState {
       case "thinking":
         if (event.labelOnly) {
           this.#breakStream();
-          this.#append(
-            newMessage(this.#nextId++, "thinking", { labelOnly: true, thinkingTokens: this.#thinkingTokens }),
-          );
+          this.#append(this.#fromEvent("thinking", { labelOnly: true, thinkingTokens: this.#thinkingTokens }));
           this.#thinkingTokens = null;
         } else if (event.text) {
           this.#assistantId = null;
@@ -2656,37 +2658,34 @@ export class ChatState {
         break;
       case "working":
         this.#breakStream();
-        if (this.messages.at(-1)?.role !== "working") this.#append(newMessage(this.#nextId++, "working"));
+        if (this.messages.at(-1)?.role !== "working") this.#append(this.#fromEvent("working"));
         break;
       case "command":
-        this.#appendShown(newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true }), event.local);
+        this.#appendShown(this.#fromEvent("assistant", { text: event.markdown, ephemeral: true }), event.local);
         break;
       case "component":
-        this.#appendShown(
-          newMessage(this.#nextId++, "interaction", { ephemeral: true, interaction: shownComponent(event) }),
-          event.local,
-        );
+        this.#appendShown(this.#fromEvent("interaction", { ephemeral: true, interaction: shownComponent(event) }), event.local);
         break;
       case "usage":
-        this.#appendShown(newMessage(this.#nextId++, "usage", { ephemeral: true, usage: event.usage }), event.local);
+        this.#appendShown(this.#fromEvent("usage", { ephemeral: true, usage: event.usage }), event.local);
         break;
       case "session_info":
         this.#appendLocal(
-          newMessage(this.#nextId++, "session_info", { ephemeral: true, currentSession: this.#labeled(event.session) }),
+          this.#fromEvent("session_info", { ephemeral: true, currentSession: this.#labeled(event.session) }),
         );
         break;
       case "reloaded": {
         const text = reloadText(event);
-        if (text) this.#appendLocal(newMessage(this.#nextId++, "info", { text, ephemeral: true }));
+        if (text) this.#appendLocal(this.#fromEvent("info", { text, ephemeral: true }));
         break;
       }
       case "notification":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "notification", { text: event.summary, result: event.status }));
+        this.#append(this.#fromEvent("notification", { text: event.summary, result: event.status }));
         break;
       case "notice":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "notice", { text: event.text, toolName: event.name, result: event.level }));
+        this.#append(this.#fromEvent("notice", { text: event.text, toolName: event.name, result: event.level }));
         break;
       case "mods":
         if (this.#attaching) this.#arrivingMods = event.state;
@@ -2719,16 +2718,16 @@ export class ChatState {
       case "session_message":
       case "plugin_message":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, event.type, { text: event.text, toolName: event.name }));
+        this.#append(this.#fromEvent(event.type, { text: event.text, toolName: event.name }));
         break;
       case "agent_report":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "agent_report", { text: event.text, toolName: event.name }));
+        this.#append(this.#fromEvent("agent_report", { text: event.text, toolName: event.name }));
         break;
       case "agent":
         this.#breakStream();
         this.#append(
-          newMessage(this.#nextId++, "agent", {
+          this.#fromEvent("agent", {
             text: event.description ?? "",
             toolName: event.subagentType,
             toolUseId: event.id,
@@ -2782,11 +2781,11 @@ export class ChatState {
       }
       case "hook":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "hook", hookFields(event)));
+        this.#append(this.#fromEvent("hook", hookFields(event)));
         break;
       case "tool_use":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "tool", { ...toolFields(event), toolMs: event.ms }));
+        this.#append(this.#fromEvent("tool", { ...toolFields(event), toolMs: event.ms }));
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
         break;
       case "tool_result":
@@ -2811,11 +2810,11 @@ export class ChatState {
         break;
       case "file_change":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "file_change", fileChangeFields(event)));
+        this.#append(this.#fromEvent("file_change", fileChangeFields(event)));
         break;
       case "shared":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "shared", { toolUseId: event.id, files: event.files }));
+        this.#append(this.#fromEvent("shared", { toolUseId: event.id, files: event.files }));
         break;
       case "compacting":
         this.compacting = true;
@@ -2857,7 +2856,7 @@ export class ChatState {
       }
       case "stop":
         this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "api_error", { text: agentStopText(event.reason), result: event.severity }));
+        this.#append(this.#fromEvent("api_error", { text: agentStopText(event.reason), result: event.severity }));
         break;
       case "terminal_opened":
         void listTerminals().then((listed) => {
@@ -2866,7 +2865,7 @@ export class ChatState {
         break;
       case "compact":
         this.#breakStream();
-        this.messages = [newMessage(this.#nextId++, "compact", { compact: compactOf(event) })];
+        this.messages = [this.#fromEvent("compact", { compact: compactOf(event) })];
         this.compacting = false;
         this.#earlierPrompts = [];
         this.#setPaging(0, true, event.earlier, null);
@@ -2986,7 +2985,7 @@ export class ChatState {
         this.messages = this.messages.filter(
           (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
         );
-        this.#append(newMessage(this.#nextId++, "interrupted"));
+        this.#append(this.#fromEvent("interrupted"));
         this.streaming = false;
         this.compacting = false;
         this.pendingToolIds = [];
@@ -3004,9 +3003,7 @@ export class ChatState {
       case "api_error":
         this.#breakStream();
         this.streamStatus = null;
-        this.#append(
-          newMessage(this.#nextId++, "api_error", { text: event.message, result: event.severity, resume: event.resume }),
-        );
+        this.#append(this.#fromEvent("api_error", { text: event.message, result: event.severity, resume: event.resume }));
         break;
       case "interaction_request":
         if (!this.messages.some((item) => item.interaction?.requestId === event.requestId)) {
@@ -3016,7 +3013,7 @@ export class ChatState {
           const toolUseId = event.toolUseId;
           this.messages = [
             ...this.messages.filter((item) => !(item.role === "tool" && item.toolUseId === toolUseId)),
-            newMessage(this.#nextId++, "interaction", {
+            this.#fromEvent("interaction", {
               text: event.input ?? "",
               toolName: event.toolName,
               toolUseId,
@@ -3027,14 +3024,7 @@ export class ChatState {
             const kind = event.kind;
             const silentActions = kind === "component";
             void notifier.notify(
-              t(
-                kind !== "component"
-                  ? "NOTIF_PERMISSION"
-                  : data.titleKey === "questions"
-                    ? "NOTIF_QUESTION"
-                    : "NOTIF_COMPONENT",
-                this.assistantName,
-              ),
+              t(AWAITING_TITLES[event.awaiting], this.assistantName),
               this.#notificationBody(kind, event.blocks, event.toolName, event.input, data.title),
               this,
               silentActions

@@ -1,3 +1,4 @@
+import type * as Contract from "$lib/contract/chatEvents";
 import type { SessionInfo } from "$lib/data/models";
 import { settings } from "$lib/data/settings.svelte";
 import { isMobile, isTauri } from "$lib/platform";
@@ -11,6 +12,12 @@ export interface NotificationAction {
   requestId: string;
   optionId: string;
 }
+
+export const AWAITING_TITLES: Record<Contract.InteractionRequest["awaiting"], string> = {
+  permission: "NOTIF_PERMISSION",
+  question: "NOTIF_QUESTION",
+  component: "NOTIF_COMPONENT",
+};
 
 const ACTION_TYPE = "interaction";
 const MAX_ACTIONS = 3;

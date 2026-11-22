@@ -130,6 +130,7 @@ export interface Activity {
   type: "activity";
   state: string;
   resident: boolean;
+  awaiting?: ("permission" | "question" | "component") | null;
   account?: string | null;
 }
 export interface AgentState {
@@ -982,6 +983,7 @@ export interface InteractionRequest {
   type: "interaction_request";
   id: string;
   kind: string;
+  awaiting: "permission" | "question" | "component";
   tool_name?: string | null;
   tool_kind?: string | null;
   tool_use_id?: string | null;
