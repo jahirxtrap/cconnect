@@ -78,6 +78,9 @@
   --chat-line-dense: 19px;
   --chat-line-code: 16.5px;
   --chat-pad-xs: 2px;
+  --chat-pad-sm: 4px;
+  --chat-pad-md: 10px;
+  --chat-pill: 24px;
   --chat-pager-gap: 14px;
   --chat-head: 28px;
   --chat-glyph: 14px;
@@ -169,10 +172,14 @@
     --chat-gap-md: round(8px, var(--px-grid, 1px));
     --chat-gap-sm: round(up, 6px, var(--px-grid, 1px));
     --chat-gap-xs: round(up, 2px, var(--px-grid, 1px));
-    --chat-line-body: round(22px, var(--px-grid, 1px));
-    --chat-line-dense: round(19px, var(--px-grid, 1px));
-    --chat-line-code: round(16.5px, var(--px-grid, 1px));
+    --chat-line-body: round(22px, var(--text-grid, 1px));
+    --chat-line-dense: round(19px, var(--text-grid, 1px));
+    --chat-line-code: round(16.5px, var(--text-grid, 1px));
     --chat-pad-xs: round(2px, var(--px-grid, 1px));
+    --chat-pad-sm: round(4px, var(--px-grid, 1px));
+    --chat-pad-md: round(10px, var(--px-grid, 1px));
+    --chat-pill: round(24px, var(--px-grid, 1px));
+    --chat-head: round(28px, var(--px-grid, 1px));
     --chat-pager-gap: round(14px, var(--px-grid, 1px));
     --chat-glyph-top: round((var(--chat-head) - var(--chat-glyph)) / 2, var(--px-grid, 1px));
     --dot-size: round(8px, var(--px-grid, 1px));
@@ -186,22 +193,22 @@
           calc(2 * var(--px-grid, 1px))
         )
     );
-    --text-body-lg--line-height: round(24px, var(--px-grid, 1px));
-    --text-body-md--line-height: round(20px, var(--px-grid, 1px));
-    --text-body-sm--line-height: round(16px, var(--px-grid, 1px));
-    --text-caption--line-height: round(16px, var(--px-grid, 1px));
-    --text-label-lg--line-height: round(20px, var(--px-grid, 1px));
-    --text-label-md--line-height: round(16px, var(--px-grid, 1px));
-    --text-label-sm--line-height: round(16px, var(--px-grid, 1px));
-    --text-item-title--line-height: round(20px, var(--px-grid, 1px));
-    --text-section--line-height: round(18px, var(--px-grid, 1px));
-    --text-block--line-height: round(20px, var(--px-grid, 1px));
-    --text-title-md--line-height: round(20px, var(--px-grid, 1px));
-    --text-title-lg--line-height: round(24px, var(--px-grid, 1px));
-    --text-topbar-title--line-height: round(22px, var(--px-grid, 1px));
-    --text-topbar-subtitle--line-height: round(14px, var(--px-grid, 1px));
-    --text-dialog-title--line-height: round(22px, var(--px-grid, 1px));
-    --text-headline--line-height: round(28px, var(--px-grid, 1px));
-    --text-metric--line-height: round(32px, var(--px-grid, 1px));
+    --text-body-lg--line-height: round(24px, var(--text-grid, 1px));
+    --text-body-md--line-height: round(20px, var(--text-grid, 1px));
+    --text-body-sm--line-height: round(16px, var(--text-grid, 1px));
+    --text-caption--line-height: round(16px, var(--text-grid, 1px));
+    --text-label-lg--line-height: round(20px, var(--text-grid, 1px));
+    --text-label-md--line-height: round(16px, var(--text-grid, 1px));
+    --text-label-sm--line-height: round(16px, var(--text-grid, 1px));
+    --text-item-title--line-height: round(20px, var(--text-grid, 1px));
+    --text-section--line-height: round(18px, var(--text-grid, 1px));
+    --text-block--line-height: round(20px, var(--text-grid, 1px));
+    --text-title-md--line-height: round(20px, var(--text-grid, 1px));
+    --text-title-lg--line-height: round(24px, var(--text-grid, 1px));
+    --text-topbar-title--line-height: round(22px, var(--text-grid, 1px));
+    --text-topbar-subtitle--line-height: round(14px, var(--text-grid, 1px));
+    --text-dialog-title--line-height: round(22px, var(--text-grid, 1px));
+    --text-headline--line-height: round(28px, var(--text-grid, 1px));
+    --text-metric--line-height: round(32px, var(--text-grid, 1px));
   }
 }

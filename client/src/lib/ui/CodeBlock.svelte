@@ -4,6 +4,7 @@
   import { contextSyntax } from "$lib/design/syntaxScope";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
   import { CopyFeedback } from "./copyFeedback.svelte";
+  import { gridHeight } from "./gridHeight";
   import { HSCROLL_CLASS, hscrollbar } from "./scrollbar";
 
   interface Props {
@@ -50,6 +51,7 @@
 
 <div data-code-block class="w-full overflow-hidden rounded-panel bg-surface-nested">
   <div
+    use:gridHeight
     class="flex items-center pr-0.5 pl-2.5"
     style="padding-top: var(--chat-pad-xs)"
   >

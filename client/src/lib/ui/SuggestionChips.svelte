@@ -13,13 +13,13 @@
   const { items, onSelect = null, class: className = "" }: Props = $props();
 </script>
 
-<div class="flex w-full flex-wrap gap-1.5 {className}">
+<div class="flex w-full flex-wrap gap-(--chat-gap-sm) {className}">
   {#each items as item (item.text)}
     <button
       type="button"
       disabled={!onSelect || (item.mode === "send" && !onSelect.sends)}
       onclick={() => onSelect?.pick(item)}
-      class="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-xl {OUTLINE_CLASS} px-3 py-1 text-left text-body-sm transition-colors select-none enabled:hover:bg-hover disabled:cursor-default disabled:opacity-40"
+      class="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-xl {OUTLINE_CLASS} px-3 py-(--chat-pad-sm) text-left text-body-sm transition-colors select-none enabled:hover:bg-hover disabled:cursor-default disabled:opacity-40"
     >
       {#if item.mode === "draft"}
         <PenLine size={14} class="shrink-0 text-accent" />

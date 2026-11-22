@@ -41,6 +41,17 @@ const storedFont = (kind: FontKind): string => {
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
+const TEXT_ZOOM_PROBE_PX = 100;
+
+const textZoom = (): number => {
+  const probe = document.createElement("span");
+  probe.style.fontSize = `${TEXT_ZOOM_PROBE_PX}px`;
+  document.body.append(probe);
+  const zoom = parseFloat(getComputedStyle(probe).fontSize) / TEXT_ZOOM_PROBE_PX;
+  probe.remove();
+  return zoom || 1;
+};
+
 const ACCENT_ALPHAS = {
   selection: 0.32,
   quote: 0.6,
@@ -118,8 +129,11 @@ class Theme {
   start() {
     prefersDark().addEventListener("change", (event) => (this.systemDark = event.matches));
     void this.#loadSystemAccent();
+    const zoom = textZoom();
     $effect(() => {
-      document.documentElement.style.setProperty("--px-grid", `${1 / (devicePixelRatio.current || 1)}px`);
+      const scale = devicePixelRatio.current || 1;
+      document.documentElement.style.setProperty("--px-grid", `${1 / scale}px`);
+      document.documentElement.style.setProperty("--text-grid", `${1 / (scale * zoom)}px`);
     });
     $effect(() => this.paint());
   }

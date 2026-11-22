@@ -20,7 +20,7 @@
 <div class="flex items-start gap-2">
   <p class="min-w-0 flex-1 font-mono text-body-md leading-(--chat-line-body) wrap-anywhere whitespace-pre-wrap"><span class="font-semibold text-accent">{SHELL_MARK}</span> {run.command}</p>
   {#if run.code !== 0}
-    <span class="flex h-(--chat-line-body) shrink-0 items-center gap-2">
+    <span class="flex h-lh shrink-0 items-center gap-2 leading-(--chat-line-body)">
       {#if run.code === null}
         <LoadingIndicator class="{GLYPH} text-accent" />
       {:else}

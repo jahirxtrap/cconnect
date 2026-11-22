@@ -17,7 +17,7 @@
 </script>
 
 <div class="w-full px-(--page-inset)">
-  <div class="rounded-panel px-3 py-2.5 {TINT_CLASS[tone]}">
+  <div class="rounded-panel px-3 py-(--chat-pad-md) {TINT_CLASS[tone]}">
     <div class="flex items-start gap-2.5 {TINT_TEXT_CLASS[tone]}">
       <span class="flex h-5 shrink-0 items-center"><Icon size={GLYPH} /></span>
       <div class="min-w-0 flex-1 text-block wrap-anywhere">

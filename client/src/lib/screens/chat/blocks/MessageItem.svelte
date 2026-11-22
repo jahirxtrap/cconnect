@@ -11,6 +11,7 @@
   import type { ChatMessage, InteractionData, Resume, Role } from "$lib/data/chatModels";
   import { formatTokens } from "$lib/data/format";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import { gridHeight } from "$lib/ui/gridHeight";
   import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -144,7 +145,7 @@
   {@const chips = content.attachments.length + content.elements.length}
   {@const corners = joinedCorners(prevRole === "user", nextRole === "user", "panel")}
   <div class="w-full px-(--page-inset)">
-    <div class="flex w-full min-w-0 flex-col {corners} bg-surface-variant px-3 py-2.5 {chips || shell ? 'chat-gap' : ''}">
+    <div class="flex w-full min-w-0 flex-col {corners} bg-surface-variant px-3 py-(--chat-pad-md) {chips || shell ? 'chat-gap' : ''}">
       {#if shell}
         <ShellOutput run={shell} />
       {:else if body}
@@ -512,7 +513,10 @@
     {@const warning = message.result === "warning"}
     {@const color = warning ? "text-orange" : "text-red"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS[warning ? 'orange' : 'red']}">
+      <div
+        use:gridHeight
+        class="flex gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS[warning ? 'orange' : 'red']}"
+      >
         <span class="flex h-8 shrink-0 items-center"><TriangleAlert size={14} class={color} /></span>
         <p class="min-w-0 flex-1 py-1.5 text-block wrap-anywhere whitespace-pre-wrap {color}">{message.text}</p>
         {@render resumeButton(color)}
@@ -523,7 +527,7 @@
     <NoticeCard tone="blue" icon={Info} {title} detail={detail.join("\n") || null} />
   {:else if message.role === "interrupted"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex h-7 items-center gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS.orange}">
+      <div class="flex h-(--chat-head) items-center gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS.orange}">
         <TriangleAlert size={14} class="shrink-0 text-orange" />
         <p class="min-w-0 flex-1 text-block text-orange">{t("INTERRUPTED")}</p>
         {@render resumeButton("text-orange")}

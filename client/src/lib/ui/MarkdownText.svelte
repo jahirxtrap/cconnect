@@ -24,6 +24,7 @@
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
   import ExternalLinkDialog from "./ExternalLinkDialog.svelte";
+  import { gridHeight } from "./gridHeight";
   import { linkOwner, OWN_LINKS } from "./linkOwner";
   import MarkdownImage from "./MarkdownImage.svelte";
   import { menuPointOf, type SharedMenuHandler } from "./menuSurface";
@@ -201,7 +202,7 @@
     {#if part.kind === "code"}
       <CodeBlock code={part.code} lang={part.lang} />
     {:else if part.kind === "images"}
-      <div class="flex w-full flex-wrap justify-center gap-1.5">
+      <div use:gridHeight class="flex w-full flex-wrap justify-center gap-(--chat-gap-sm)">
         {#each part.items as image (image.url)}
           <MarkdownImage url={image.url} alt={image.alt} onOpen={open} />
         {/each}

@@ -12,7 +12,7 @@
 
   const { millis = null, onEarlier = null, loading = false }: Props = $props();
 
-  const PILL_CLASS = "flex h-6 items-center rounded-full bg-surface-variant px-3 text-label-sm text-on-surface-variant";
+  const PILL_CLASS = "flex h-(--chat-pill) items-center rounded-full bg-surface-variant px-3 text-label-sm text-on-surface-variant";
   const GLYPH_CLASS = "size-(--chat-glyph) shrink-0";
 </script>
 

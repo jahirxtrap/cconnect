@@ -20,7 +20,7 @@
     onmenu(menuPointOf(event));
   };
 
-  const BASE_CLASS = `flex max-w-60 shrink-0 items-center gap-1.5 rounded-full ${OUTLINE_CLASS} px-2.5 py-1 select-none`;
+  const BASE_CLASS = `flex max-w-60 shrink-0 items-center gap-1.5 rounded-full ${OUTLINE_CLASS} px-2.5 py-(--chat-pad-sm) select-none`;
 </script>
 
 {#snippet body()}
