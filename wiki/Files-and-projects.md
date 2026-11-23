@@ -11,7 +11,8 @@ right from the preview if it's no longer needed.
 Video and audio play in CConnect's own player, the same in the preview, the
 gallery and the chat: seek, volume, playback speed and full screen. On a phone,
 or where the player is narrow, the speaker opens a volume menu, and full screen
-turns the video sideways unless auto-rotate is on. In the preview, the gallery
+turns a wide video sideways unless auto-rotate is on, while a tall one stays
+upright. In the preview, the gallery
 and full screen a video zooms like an image, with the mouse wheel or a pinch. An audio
 file opened in the preview shows its cover, title and artist, or a placeholder
 when it has no cover. A song Claude sends on its own shows in the chat as a card

@@ -38,7 +38,8 @@ cconnect expose tailscale
 
 What this does:
 
-1. Runs `tailscale up` and `tailscale funnel --bg 8723` to publish the backend
+1. Opens the Tailscale app if it is closed (Windows and macOS), then runs
+   `tailscale up` and `tailscale funnel --bg 8723` to publish the backend
    at `https://<hostname>.<tailnet>.ts.net` (port 443).
 2. If `PUBLIC_ACCESS_TOKEN` is unset, generates one and persists it in
    `~/.cconnect/data/config/.env` (reused on subsequent runs).
