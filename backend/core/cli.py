@@ -16,7 +16,7 @@ import subprocess
 import sys
 import threading
 import time
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -43,7 +43,7 @@ _WINDOWS_APP = "tailscale-ipn.exe"
 _MAC_APP = "Tailscale"
 _TAILSCALE_WAIT = 30
 _SIGNED_OUT = ("NeedsLogin", "NoState")
-_NOT_UP = ("", *_SIGNED_OUT)
+_STARTING = ("", "NoState")
 _APP = "core.app:app"
 _COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "key")
 _TOP_FLAGS = ("-h", "--help", "-v", "--version")
@@ -114,38 +114,64 @@ def _app_running(name: str) -> bool:
     return any(process.info["name"] == name for process in psutil.process_iter(["name"]))
 
 
-def _open_app(tailscale: str) -> bool:
+def _open_app(tailscale: str) -> None:
     if sys.platform == "win32":
         app = Path(tailscale).with_name(_WINDOWS_APP)
-        if not app.is_file() or _app_running(_WINDOWS_APP):
-            return False
-        subprocess.Popen(
-            [*self_update.SHELL, f"Start-Process -FilePath {self_update.quoted(str(app))}"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    elif sys.platform == "darwin":
-        if _app_running(_MAC_APP) or subprocess.run(["open", "-a", _MAC_APP], capture_output=True).returncode != 0:
-            return False
-    else:
-        return False
+        if app.is_file() and not _app_running(_WINDOWS_APP):
+            subprocess.Popen(
+                [*self_update.SHELL, f"Start-Process -FilePath {self_update.quoted(str(app))}"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+    elif sys.platform == "darwin" and not _app_running(_MAC_APP):
+        subprocess.run(["open", "-a", _MAC_APP], capture_output=True)
+
+
+def _wait_running() -> None:
     with suppress(OSError, subprocess.SubprocessError):
         subprocess.run(
             ["tailscale", "wait", "--timeout", f"{_TAILSCALE_WAIT}s"],
             capture_output=True, text=True, timeout=_TAILSCALE_WAIT + _STOP_TIMEOUT,
         )
-    return True
 
 
-def _require_tailscale() -> dict:
+@contextmanager
+def _held_client():
+    """Holds a Tailscale IPN bus watch open for the duration."""
+    watch = subprocess.Popen(
+        ["tailscale", "debug", "watch-ipn"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+        text=True, encoding="utf-8", errors="replace",
+    )
+    try:
+        watch.stderr.readline()
+        yield
+    finally:
+        watch.terminate()
+        with suppress(subprocess.TimeoutExpired):
+            watch.wait(_STOP_TIMEOUT)
+
+
+@contextmanager
+def _tailscale_session():
+    """Yields Tailscale's status once it is up, with a client attached throughout."""
     tailscale = shutil.which("tailscale")
     if tailscale is None:
         _abort("Tailscale is not installed. Get it from https://tailscale.com/download and try again.")
+    if sys.platform == "darwin":
+        _open_app(tailscale)
+    with _held_client():
+        yield _require_tailscale()
+        if sys.platform == "win32":
+            _open_app(tailscale)
+
+
+def _require_tailscale() -> dict:
     status = _tailscale_status()
-    state = status.get("BackendState") or ""
-    if state in _NOT_UP and _open_app(tailscale):
+    if (status.get("BackendState") or "") in _STARTING:
+        _wait_running()
         status = _tailscale_status()
-        state = status.get("BackendState") or ""
+    state = status.get("BackendState") or ""
     if not state:
         _abort("Tailscale is installed but not running. Start the Tailscale app or service and try again.")
     if state in _SIGNED_OUT:
@@ -164,18 +190,18 @@ def _funnel_hint(output: str) -> str:
 
 def _start_tailscale_funnel(port: int) -> str:
     """Start Tailscale Funnel in the background and return the public URL."""
-    status = _require_tailscale()
-    try:
-        subprocess.run(["tailscale", "funnel", "reset"], capture_output=True, timeout=10)
-        result = subprocess.run(
-            ["tailscale", "funnel", "--bg", str(port)],
-            capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
-        )
-    except subprocess.CalledProcessError as exc:
-        output = (exc.stderr or "") + (exc.stdout or "")
-        _abort(f"{_funnel_hint(output)}tailscale funnel failed:\n{output}")
-    except subprocess.SubprocessError as exc:
-        _abort(f"tailscale funnel did not answer: {exc}")
+    with _tailscale_session() as status:
+        try:
+            subprocess.run(["tailscale", "funnel", "reset"], capture_output=True, timeout=10)
+            result = subprocess.run(
+                ["tailscale", "funnel", "--bg", str(port)],
+                capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
+            )
+        except subprocess.CalledProcessError as exc:
+            output = (exc.stderr or "") + (exc.stdout or "")
+            _abort(f"{_funnel_hint(output)}tailscale funnel failed:\n{output}")
+        except subprocess.SubprocessError as exc:
+            _abort(f"tailscale funnel did not answer: {exc}")
 
     output = (result.stdout or "") + (result.stderr or "")
     match = re.search(r"https://[^\s]+\.ts\.net/?", output)
@@ -188,20 +214,20 @@ def _start_tailscale_funnel(port: int) -> str:
 
 
 def _start_tailscale_serve(port: int) -> str:
-    status = _require_tailscale()
-    host = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
-    if not host:
-        _abort("tailscale did not report a name for this machine.")
-    try:
-        subprocess.run(["tailscale", "serve", "reset"], capture_output=True, timeout=10)
-        result = subprocess.run(
-            ["tailscale", "serve", "--bg", str(port)],
-            capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
-        )
-    except subprocess.CalledProcessError as exc:
-        _abort(f"tailscale serve failed:\n{(exc.stderr or '') + (exc.stdout or '')}")
-    except subprocess.SubprocessError as exc:
-        _abort(f"tailscale serve did not answer: {exc}")
+    with _tailscale_session() as status:
+        host = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+        if not host:
+            _abort("tailscale did not report a name for this machine.")
+        try:
+            subprocess.run(["tailscale", "serve", "reset"], capture_output=True, timeout=10)
+            result = subprocess.run(
+                ["tailscale", "serve", "--bg", str(port)],
+                capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
+            )
+        except subprocess.CalledProcessError as exc:
+            _abort(f"tailscale serve failed:\n{(exc.stderr or '') + (exc.stdout or '')}")
+        except subprocess.SubprocessError as exc:
+            _abort(f"tailscale serve did not answer: {exc}")
     output = (result.stdout or "") + (result.stderr or "")
     match = re.search(r"https://[^\s]+\.ts\.net/?", output)
     return match.group(0).rstrip("/") if match else f"https://{host}"
