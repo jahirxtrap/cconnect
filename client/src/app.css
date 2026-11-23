@@ -199,12 +199,6 @@ html[data-theme="dark"] {
   height: 100%;
 }
 
-@keyframes lobes-cycle {
-  to {
-    transform: translateX(-100%);
-  }
-}
-
 @keyframes spinner-turn {
   to {
     transform: rotate(360deg);
@@ -339,6 +333,10 @@ html[data-theme="dark"] {
   backdrop-filter: blur(var(--glass-blur));
 }
 
+.glass-panel:has([data-full-view]) {
+  backdrop-filter: none;
+}
+
 .over-backdrop [data-block-head].sticky {
   background-color: transparent;
 }
@@ -432,7 +430,6 @@ html.pdf-screen .pdf-screen-root {
     width: calc(var(--lobes-frames) * 100%);
     background-color: currentColor;
     mask: var(--lobes-sprite) 0 0 / 100% 100% no-repeat;
-    animation: lobes-cycle var(--lobes-cycle) steps(var(--lobes-frames)) var(--lobes-phase) infinite;
   }
 
   .ripple {

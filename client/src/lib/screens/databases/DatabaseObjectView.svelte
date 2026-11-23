@@ -30,7 +30,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
-  import { FULL_INSET_CLASS } from "$lib/screens/chat/paneChrome";
+  import { FULL_VIEW_CLASS } from "$lib/screens/chat/paneChrome";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { backend } from "$lib/services/backend.svelte";
@@ -410,10 +410,7 @@
     {@render content()}
   </div>
 {:else}
-  <div
-    {...OWN_SWIPE}
-    class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {FULL_INSET_CLASS}"
-  >
+  <div {...OWN_SWIPE} data-full-view class={FULL_VIEW_CLASS}>
     <AppTopBar title={entry?.name ?? t("DATABASES")} subtitle={title} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>

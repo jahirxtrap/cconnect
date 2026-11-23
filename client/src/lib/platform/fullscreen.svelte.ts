@@ -4,6 +4,11 @@ interface NativeVideo extends HTMLVideoElement {
   webkitEnterFullscreen?: () => void;
 }
 
+const androidFullscreen = () =>
+  (window as unknown as { AndroidFullscreen?: { shape: (upright: boolean) => void } }).AndroidFullscreen;
+
+const isUpright = (video: HTMLVideoElement | null): boolean => video !== null && video.videoHeight > video.videoWidth;
+
 class Fullscreen {
   element = $state<Element | null>(null);
   #turned = false;
@@ -23,8 +28,8 @@ class Fullscreen {
     });
   }
 
-  #turn() {
-    if (isTauri || !isTouch) return;
+  #turn(upright: boolean) {
+    if (isTauri || !isTouch || upright) return;
     void screen.orientation.lock?.("landscape").then(
       () => (this.#turned = true),
       () => {},
@@ -45,8 +50,10 @@ class Fullscreen {
       return;
     }
     if (document.fullscreenEnabled) {
+      const upright = isUpright(video);
+      androidFullscreen()?.shape(upright);
       await target.requestFullscreen();
-      this.#turn();
+      this.#turn(upright);
       return;
     }
     (video as NativeVideo | null)?.webkitEnterFullscreen?.();

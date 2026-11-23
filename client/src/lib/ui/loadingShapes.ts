@@ -91,8 +91,6 @@ const FRAME_RATE = 60;
 
 export const LOBE_FRAMES = Math.round((CYCLE_MS / 1000) * FRAME_RATE);
 
-export const LOBE_CYCLE_MS = CYCLE_MS;
-
 const frameTime = (frame: number) => (frame * CYCLE_MS) / LOBE_FRAMES;
 
 const LOBE_GROWTH =
@@ -117,4 +115,11 @@ export const lobeSprite = (box: number): string => {
   return url;
 };
 
-export const lobePhase = (): number => -(Number(document.timeline.currentTime ?? 0) % CYCLE_MS);
+export const lobeCycle = (strip: HTMLElement) => {
+  const animation = strip.animate(
+    { transform: ["translateX(0)", "translateX(-100%)"] },
+    { duration: CYCLE_MS, iterations: Infinity, easing: `steps(${LOBE_FRAMES})` },
+  );
+  animation.startTime = 0;
+  return { destroy: () => animation.cancel() };
+};

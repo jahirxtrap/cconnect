@@ -6,6 +6,8 @@ export const CHAT_COLUMN_CLASS = "mx-auto w-full max-w-(--chat-column)";
 
 export const FULL_INSET_CLASS = "[--page-inset:var(--page-inset-full)]";
 
+export const FULL_VIEW_CLASS = `safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface ${FULL_INSET_CLASS}`;
+
 export const PANE_CARD_SHAPE_CLASS = "overflow-hidden rounded-panel";
 
 export const PANE_CARD_CLASS = `${PANE_CARD_SHAPE_CLASS} bg-background`;

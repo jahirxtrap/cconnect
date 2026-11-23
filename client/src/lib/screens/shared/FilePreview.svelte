@@ -38,6 +38,7 @@
   import { fileIcon } from "$lib/ui/fileIcons";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import { FULL_VIEW_CLASS } from "$lib/screens/chat/paneChrome";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
@@ -499,13 +500,7 @@
     {@render content()}
   </div>
 {:else}
-  <div
-    {...OWN_SWIPE}
-    class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {androidPdf &&
-    kind === 'pdf'
-      ? 'pdf-screen-root'
-      : ''}"
-  >
+  <div {...OWN_SWIPE} data-full-view class="{FULL_VIEW_CLASS} {androidPdf && kind === 'pdf' ? 'pdf-screen-root' : ''}">
     <AppTopBar title={t(kind === "drawing" ? "DRAWING" : "VIEW")} subtitle={filename} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>

@@ -76,6 +76,8 @@ class MainActivity : TauriActivity() {
 
   private val pdfScreen by lazy { PdfScreen(this) { content } }
 
+  private val fullscreenShape = FullscreenShape()
+
   private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
   private var pendingFiles: ValueCallback<Array<Uri>>? = null
@@ -237,8 +239,9 @@ class MainActivity : TauriActivity() {
     content = webView
     webView.post {
       val chrome = webView.webChromeClient
-      if (chrome != null && chrome !is Fullscreen) webView.webChromeClient = Fullscreen(this, chrome)
+      if (chrome != null && chrome !is Fullscreen) webView.webChromeClient = Fullscreen(this, chrome, fullscreenShape)
     }
+    webView.addJavascriptInterface(fullscreenShape, "AndroidFullscreen")
     webView.addJavascriptInterface(SystemBars(), "AndroidSystemBars")
     webView.addJavascriptInterface(SafeAreaBridge(), "AndroidInsets")
     webView.addJavascriptInterface(downloads, "AndroidDownloads")

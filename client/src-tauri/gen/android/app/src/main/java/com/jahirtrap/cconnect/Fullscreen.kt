@@ -9,6 +9,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
 import android.webkit.GeolocationPermissions
+import android.webkit.JavascriptInterface
 import android.webkit.JsPromptResult
 import android.webkit.JsResult
 import android.webkit.PermissionRequest
@@ -22,7 +23,21 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
-class Fullscreen(private val activity: ComponentActivity, private val inner: WebChromeClient) : WebChromeClient() {
+class FullscreenShape {
+  @Volatile var upright = false
+    private set
+
+  @JavascriptInterface
+  fun shape(upright: Boolean) {
+    this.upright = upright
+  }
+}
+
+class Fullscreen(
+  private val activity: ComponentActivity,
+  private val inner: WebChromeClient,
+  private val shape: FullscreenShape,
+) : WebChromeClient() {
   private var shown: View? = null
   private var callback: CustomViewCallback? = null
   private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -56,7 +71,7 @@ class Fullscreen(private val activity: ComponentActivity, private val inner: Web
     bars.hide(WindowInsetsCompat.Type.systemBars())
     back.isEnabled = true
     orientation = activity.requestedOrientation
-    if (!autoRotate) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+    if (!autoRotate && !shape.upright) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
   }
 
   override fun onHideCustomView() {
