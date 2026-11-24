@@ -48,6 +48,7 @@
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { toolIcon } from "$lib/ui/toolIcons";
   import { RESUME_LOOK } from "./resume";
   import { rowSite } from "./rowSite";
   import { TINT_CLASS } from "./tint";
@@ -456,6 +457,17 @@
       {onToggle}
     >
       <MarkdownText text={message.text} dense class={fromPlugin ? "text-on-surface-variant" : ""} />
+    </Collapsible>
+  {:else if message.role === "scheduled_message"}
+    <Collapsible
+      label={t("SCHEDULED_MESSAGE")}
+      icon={toolIcon("CronCreate", false)}
+      preview={message.text}
+      labelOnly={labelMode || !message.text.trim()}
+      {expanded}
+      {onToggle}
+    >
+      <MarkdownText text={message.text} dense />
     </Collapsible>
   {:else if message.role === "usage" && message.usage}
     <div class="w-full px-(--page-inset) select-none">

@@ -119,6 +119,9 @@
       <p class="mt-1 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface-variant">{input}</p>
     {/if}
   {/if}
+  {#if data.reason}
+    <p class="mt-1 text-body-sm wrap-anywhere text-on-surface-variant">{data.reason}</p>
+  {/if}
 
   {#if data.resolved === null}
     <div class="mt-2 flex flex-wrap gap-2">

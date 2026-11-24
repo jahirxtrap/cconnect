@@ -27,6 +27,7 @@ export type Role =
   | "hook"
   | "session_message"
   | "plugin_message"
+  | "scheduled_message"
   | "agent_report"
   | "usage"
   | "session_info";
@@ -219,6 +220,7 @@ export interface ComponentElement {
 export interface InteractionRequest {
   requestId: string;
   kind: string;
+  reason: string | null;
   options: InteractionOption[];
   title: string | null;
   titleKey: string | null;
@@ -484,6 +486,7 @@ export const isPending = (data: InteractionData): boolean =>
 export const emptyInteraction = (requestId: string, kind: string): InteractionData => ({
   requestId,
   kind,
+  reason: null,
   options: [],
   title: null,
   titleKey: null,

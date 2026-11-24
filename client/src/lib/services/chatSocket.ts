@@ -166,6 +166,7 @@ export type ServerEvent =
   | { type: "mod_scroll"; component: ModComponent; instanceId: string; offset: number; followEnd: boolean }
   | { type: "session_message"; name: string | null; text: string }
   | { type: "plugin_message"; name: string | null; text: string }
+  | { type: "scheduled_message"; text: string }
   | { type: "agent_report"; name: string | null; text: string }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
@@ -975,6 +976,8 @@ export class ChatSocket {
       case "session_message":
       case "plugin_message":
         return { type: event.type, name: event.name ?? null, text: event.text ?? "" };
+      case "scheduled_message":
+        return { type: "scheduled_message", text: event.text ?? "" };
       case "agent_report":
         return { type: "agent_report", name: event.name ?? null, text: event.text ?? "" };
       case "queued":
@@ -1104,6 +1107,7 @@ export class ChatSocket {
           toolName: event.tool_name ?? null,
           toolUseId: event.tool_use_id ?? null,
           input: event.input ?? null,
+          reason: event.reason ?? null,
           title: event.title ?? null,
           titleKey: event.title_key ?? null,
           icon: event.icon ?? null,

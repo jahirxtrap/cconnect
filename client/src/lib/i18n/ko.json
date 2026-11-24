@@ -877,6 +877,7 @@
   "AGENT_REPORT": "에이전트 보고서",
   "SESSION_MESSAGE": "다른 세션의 메시지",
   "PLUGIN_MESSAGE": "Mod의 메시지",
+  "SCHEDULED_MESSAGE": "예약된 메시지",
   "TOKENS_COUNT_ONE": "{2} 토큰",
   "TOKENS_COUNT_OTHER": "{2} 토큰",
   "AGENT_ASYNC_LAUNCHED": "백그라운드",

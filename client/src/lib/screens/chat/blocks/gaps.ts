@@ -26,6 +26,7 @@ const GROUPED: GapRole[] = [
   "hook",
   "session_message",
   "plugin_message",
+  "scheduled_message",
 ];
 
 const ROW_ALIKE: Partial<Record<GapRole, GapRole>> = { notice: "tool", hook: "tool" };

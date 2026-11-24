@@ -877,6 +877,7 @@
   "AGENT_REPORT": "智能体报告",
   "SESSION_MESSAGE": "来自其他会话的消息",
   "PLUGIN_MESSAGE": "来自模组的消息",
+  "SCHEDULED_MESSAGE": "定时消息",
   "TOKENS_COUNT_ONE": "{2} Token",
   "TOKENS_COUNT_OTHER": "{2} Token",
   "AGENT_ASYNC_LAUNCHED": "后台",

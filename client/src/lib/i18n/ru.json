@@ -911,6 +911,7 @@
   "AGENT_REPORT": "Отчёт агента",
   "SESSION_MESSAGE": "Сообщение из другого сеанса",
   "PLUGIN_MESSAGE": "Сообщение от мода",
+  "SCHEDULED_MESSAGE": "Запланированное сообщение",
   "TOKENS_COUNT_ONE": "{2} токен",
   "TOKENS_COUNT_FEW": "{2} токена",
   "TOKENS_COUNT_MANY": "{2} токенов",

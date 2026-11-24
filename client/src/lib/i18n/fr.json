@@ -877,6 +877,7 @@
   "AGENT_REPORT": "Rapport de l’agent",
   "SESSION_MESSAGE": "Message d’une autre session",
   "PLUGIN_MESSAGE": "Message d’un mod",
+  "SCHEDULED_MESSAGE": "Message programmé",
   "TOKENS_COUNT_ONE": "{2} jeton",
   "TOKENS_COUNT_OTHER": "{2} jetons",
   "AGENT_ASYNC_LAUNCHED": "en arrière-plan",

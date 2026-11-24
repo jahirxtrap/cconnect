@@ -2988,6 +2988,17 @@
           ],
           "default": null
         },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "options": {
           "default": [],
           "items": {
@@ -5724,6 +5735,79 @@
       "title": "Result",
       "type": "object"
     },
+    "ScheduledMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "replay": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "scheduled_message",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "text"
+      ],
+      "title": "ScheduledMessage",
+      "type": "object"
+    },
     "SessionInfo": {
       "additionalProperties": false,
       "properties": {
@@ -7963,6 +8047,7 @@
       "rejected": "#/$defs/Rejected",
       "reloaded": "#/$defs/Reloaded",
       "result": "#/$defs/Result",
+      "scheduled_message": "#/$defs/ScheduledMessage",
       "session_info": "#/$defs/SessionInfo",
       "session_message": "#/$defs/SessionMessage",
       "session_started": "#/$defs/SessionStarted",
@@ -8127,6 +8212,9 @@
     },
     {
       "$ref": "#/$defs/PluginMessage"
+    },
+    {
+      "$ref": "#/$defs/ScheduledMessage"
     },
     {
       "$ref": "#/$defs/AgentReport"

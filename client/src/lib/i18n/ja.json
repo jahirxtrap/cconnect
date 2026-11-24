@@ -877,6 +877,7 @@
   "AGENT_REPORT": "エージェントのレポート",
   "SESSION_MESSAGE": "別のセッションからのメッセージ",
   "PLUGIN_MESSAGE": "Mod からのメッセージ",
+  "SCHEDULED_MESSAGE": "予定されたメッセージ",
   "TOKENS_COUNT_ONE": "{2} トークン",
   "TOKENS_COUNT_OTHER": "{2} トークン",
   "AGENT_ASYNC_LAUNCHED": "バックグラウンド",

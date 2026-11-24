@@ -46,6 +46,7 @@ export type ChatEvent =
   | ModScroll
   | SessionMessage
   | PluginMessage
+  | ScheduledMessage
   | AgentReport
   | Todos
   | Task
@@ -752,6 +753,15 @@ export interface PluginMessage {
   name?: string | null;
   text: string;
 }
+export interface ScheduledMessage {
+  seq?: number | null;
+  ts?: number | null;
+  channel?: string | null;
+  parent?: string | null;
+  replay?: boolean | null;
+  type: "scheduled_message";
+  text: string;
+}
 export interface AgentReport {
   seq?: number | null;
   ts?: number | null;
@@ -988,6 +998,7 @@ export interface InteractionRequest {
   tool_kind?: string | null;
   tool_use_id?: string | null;
   input?: string | null;
+  reason?: string | null;
   options?: InteractionOption[];
   free_text?: unknown;
   title?: string | null;

@@ -640,6 +640,7 @@ def _build_can_use_tool(
             "tool_name": _display_tool_name(tool_name),
             "tool_use_id": getattr(ctx, "tool_use_id", None),
             "input": tool_display,
+            "reason": getattr(ctx, "decision_reason", None),
             "options": [{"id": "allow"}, *always, {"id": "deny"}, {"id": "different"}],
             "free_text": "off",
         })

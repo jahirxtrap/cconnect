@@ -57,6 +57,7 @@ const ROLES: Record<string, Role> = {
   hook: "hook",
   session_message: "session_message",
   plugin_message: "plugin_message",
+  scheduled_message: "scheduled_message",
   agent_report: "agent_report",
   tool_use: "tool",
   tool_result: "tool_result",

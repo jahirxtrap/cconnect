@@ -379,9 +379,9 @@ def _user_row(entry: dict) -> Optional[dict]:
             return None
         text = _text_from_content(att.get("prompt")).strip()
         source = att.get("source_uuid")
-    elif etype == "user" and entry.get("isMeta") and (peer := _peer_message(entry)) is not None:
+    elif etype == "user" and entry.get("isMeta") and (carried := _carried_meta(entry)) is not None:
         uid = entry.get("uuid")
-        return {"uuid": uid, "text": peer["text"], "ts": _parse_ts(entry.get("timestamp")), "source": None, "carried": peer} if uid else None
+        return {"uuid": uid, "text": carried["text"], "ts": _parse_ts(entry.get("timestamp")), "source": None, "carried": carried} if uid else None
     elif etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
         return None
     else:
@@ -1514,6 +1514,7 @@ _PLUGIN_MESSAGE_RE = re.compile(
 )
 _INCOMING_LEAD = "Another Claude session sent a message:"
 _PEER_ORIGIN = "peer"
+_SCHEDULED_TURN = "scheduled"
 _WRITTEN_TWICE = frozenset({"agent_report", "session_message"})
 _REPORT_LEAD_RE = re.compile(r"^.*?The report follows:[ \t]*\n", re.DOTALL)
 _ATTRIBUTE_RE = re.compile(r'([\w-]+)="([^"]*)"')
@@ -1538,6 +1539,17 @@ def _peer_message(entry: dict) -> dict | None:
     if not isinstance(origin, dict) or origin.get("kind") != _PEER_ORIGIN:
         return None
     return {"type": "session_message", "name": str(origin.get("name") or ""), "text": str(origin.get("body") or "").strip()}
+
+
+def _scheduled_message(entry: dict) -> dict | None:
+    if entry.get("turnOrigin") != _SCHEDULED_TURN:
+        return None
+    text = _text_from_content((entry.get("message") or {}).get("content")).strip()
+    return {"type": "scheduled_message", "text": text} if text else None
+
+
+def _carried_meta(entry: dict) -> dict | None:
+    return _peer_message(entry) or _scheduled_message(entry)
 
 
 def _plugin_message_item(text: str) -> dict | None:
@@ -1902,8 +1914,8 @@ def _normalize(
                 messages.append({"type": "summary", "text": text})
             continue
         if entry.get("isMeta"):
-            if i >= last_boundary and (peer := _peer_message(entry)) is not None:
-                messages.extend(_once([peer]))
+            if i >= last_boundary and (carried := _carried_meta(entry)) is not None:
+                messages.extend(_once([carried]))
             elif i >= last_boundary:
                 meta_text = _text_from_content(entry.get("message", {}).get("content"))
                 feedback = hook_events.from_feedback(meta_text)

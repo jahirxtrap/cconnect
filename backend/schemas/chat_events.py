@@ -503,6 +503,11 @@ class PluginMessage(Event):
     text: str
 
 
+class ScheduledMessage(Event):
+    type: Literal["scheduled_message"]
+    text: str
+
+
 class AgentReport(Event):
     type: Literal["agent_report"]
     name: Optional[str] = None
@@ -633,6 +638,7 @@ class InteractionRequest(Event):
     tool_kind: Optional[str] = None
     tool_use_id: Optional[str] = None
     input: Optional[str] = None
+    reason: Optional[str] = None
     options: list[InteractionOption] = []
     free_text: Unknown = None
     title: Optional[str] = None
@@ -667,7 +673,7 @@ ChatEvent = Annotated[
         Status, Compact, CompactSummary, AskText, AskWorking, AskSession, Command, Usage, SessionInfo, Component,
         Reloaded, Agent, TaskRunning, TaskProgress, AgentResult, ThinkingTokens, Hook, Notification, Notice, Mods, Commands,
         ModToast, ModInvalidate, ModTree, ModReply, ModRequest, ModFocus, ModScroll, SessionMessage,
-        PluginMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
+        PluginMessage, ScheduledMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
         Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, ShellOutput, ShellExit, HistoryChunk, Tail,
         InteractionRequest, InteractionResolved, Pong,
     ],

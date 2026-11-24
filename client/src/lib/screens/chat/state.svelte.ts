@@ -76,6 +76,7 @@ const shownComponent = (event: EventOf<"component">): InteractionData => ({
 const requestedInteraction = (event: InteractionRequest): InteractionData => ({
   ...emptyInteraction(event.requestId, event.kind),
   options: event.options,
+  reason: event.reason,
   title: event.title,
   titleKey: event.titleKey,
   icon: event.icon,
@@ -2719,6 +2720,10 @@ export class ChatState {
       case "plugin_message":
         this.#breakStream();
         this.#append(this.#fromEvent(event.type, { text: event.text, toolName: event.name }));
+        break;
+      case "scheduled_message":
+        this.#breakStream();
+        this.#append(this.#fromEvent("scheduled_message", { text: event.text }));
         break;
       case "agent_report":
         this.#breakStream();
