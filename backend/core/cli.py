@@ -25,7 +25,7 @@ import psutil
 import qrcode
 from dotenv import set_key
 
-from core import cli_manager, detached, paths, process_tree, release, sdk, self_update
+from core import cli_manager, detached, log_files, paths, process_tree, release, sdk, self_update
 from core.config import PORT, RESTART_EXIT_CODE, SUPERVISOR_VAR
 from services import agent_registry, repo, system_monitor
 
@@ -359,7 +359,7 @@ def _expose(
 
 
 def _spawn_detached() -> int:
-    handle = paths.DETACHED_LOG_FILE.open("ab")
+    handle = log_files.append_only(paths.DETACHED_LOG_FILE)
     kwargs: dict = {
         "stdin": subprocess.DEVNULL,
         "stdout": handle,
@@ -804,6 +804,7 @@ def main():
                     break
                 except subprocess.TimeoutExpired:
                     process_tree.reap_adopted(process.pid)
+                    detached.cap_log()
                     asked = paths.RESTART_FLAG.exists()
                     stopped = paths.STOP_FLAG.exists()
                     if asked or stopped:

@@ -437,7 +437,9 @@ fn follow_runtime(app: &AppHandle, state: &LocalServerState, config: &LocalServe
     *watch = None;
     let handle = app.clone();
     let Ok(mut watcher) = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-        if event.is_ok_and(|event| event.paths.iter().any(|path| path.file_name() == Some(name.as_os_str()))) {
+        if event.is_ok_and(|event| {
+            !event.kind.is_access() && event.paths.iter().any(|path| path.file_name() == Some(name.as_os_str()))
+        }) {
             let handle = handle.clone();
             std::thread::spawn(move || announce(&handle));
         }

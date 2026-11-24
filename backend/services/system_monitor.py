@@ -15,7 +15,7 @@ from typing import Callable
 import psutil
 from loguru import logger
 
-from core import paths
+from core import log_files, paths
 
 _READ_CAP = 64 * 1024
 _KEPT_LOGS = 5
@@ -62,6 +62,9 @@ def reset_log_file() -> None:
     with suppress(OSError):
         paths.SERVER_LOG_FILE.replace(_previous_log(1))
     paths.SERVER_LOG_FILE.write_text("", encoding="utf-8")
+    for index in range(1, _KEPT_LOGS + 1):
+        with suppress(OSError):
+            log_files.trim(_previous_log(index))
 
 
 def follow_logs(listener: Callable[[dict], None]) -> Callable[[], None]:
@@ -78,11 +81,12 @@ def _sink(message) -> None:
         "message": record["message"],
         "pid": record["process"].id,
     }
-    try:
-        with paths.SERVER_LOG_FILE.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except OSError:
-        pass
+    line = f"{json.dumps(entry, ensure_ascii=False)}\n".encode("utf-8", errors="replace")
+    with suppress(OSError):
+        if not log_files.fits(paths.SERVER_LOG_FILE, len(line)):
+            reset_log_file()
+        with paths.SERVER_LOG_FILE.open("ab") as fh:
+            fh.write(line)
     for listener in list(_listeners):
         listener(entry)
 

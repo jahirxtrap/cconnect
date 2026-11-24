@@ -65,6 +65,7 @@ ANDROID_TOOLS_DIR = CACHE_DIR / "android"
 SERVER_LOG_FILE = LOGS_DIR / "server.jsonl"
 PREVIOUS_SERVER_LOG_FILE = LOGS_DIR / "server.prev.jsonl"
 DETACHED_LOG_FILE = LOGS_DIR / "detached.log"
+PREVIOUS_DETACHED_LOG_FILE = LOGS_DIR / "detached.prev.log"
 UPDATE_LOG_FILE = LOGS_DIR / "update.log"
 
 

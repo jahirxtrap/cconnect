@@ -1,10 +1,21 @@
+import os
 from contextlib import suppress
 
 import psutil
 
-from core import paths
+from core import log_files, paths
 
 CLI_MODULE = "core.cli"
+_OUTPUT = 2
+
+
+def cap_log() -> None:
+    log = paths.DETACHED_LOG_FILE
+    with suppress(OSError):
+        if log_files.fits(log) or not os.path.samestat(os.fstat(_OUTPUT), log.stat()):
+            return
+        paths.PREVIOUS_DETACHED_LOG_FILE.write_bytes(log_files.tail(log))
+        os.truncate(log, 0)
 
 
 def recorded_process(pid: int) -> psutil.Process | None:
