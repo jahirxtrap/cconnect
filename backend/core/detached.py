@@ -7,6 +7,14 @@ from core import paths
 CLI_MODULE = "core.cli"
 
 
+def recorded_process(pid: int) -> psutil.Process | None:
+    with suppress(psutil.Error, OSError):
+        process = psutil.Process(pid)
+        if process.create_time() <= paths.RUNTIME_FILE.stat().st_mtime:
+            return process
+    return None
+
+
 def runtime() -> dict[str, str]:
     try:
         recorded = dict(
@@ -17,7 +25,7 @@ def runtime() -> dict[str, str]:
     except OSError:
         return {}
     pid = int(recorded.get("PID") or 0)
-    return recorded if pid and psutil.pid_exists(pid) else {}
+    return recorded if pid and recorded_process(pid) else {}
 
 
 def running_pid() -> int | None:

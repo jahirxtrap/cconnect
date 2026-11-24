@@ -578,6 +578,7 @@
           messages={chat.view}
           pendingToolIds={chat.runningView}
           streaming={chat.streaming}
+          {busy}
           compacting={chat.compacting || activity === "compacting"}
           streamStatus={chat.streamStatus}
           apiRetry={chat.apiRetry}

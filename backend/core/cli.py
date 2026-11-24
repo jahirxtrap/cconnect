@@ -406,11 +406,8 @@ def _await_start(pid: int, port: int) -> None:
 
 
 def _supervisor(live: dict[str, str]) -> psutil.Process | None:
-    """The process that runs the recorded server; one started after the record is a reused pid."""
-    with suppress(psutil.Error, KeyError, ValueError, OSError):
-        process = psutil.Process(int(live["SUPERVISOR"]))
-        if process.create_time() <= paths.RUNTIME_FILE.stat().st_mtime:
-            return process
+    with suppress(KeyError, ValueError):
+        return detached.recorded_process(int(live["SUPERVISOR"]))
     return None
 
 

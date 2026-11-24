@@ -36,6 +36,7 @@
     messages: ChatMessage[];
     pendingToolIds: string[];
     streaming: boolean;
+    busy: boolean;
     compacting: boolean;
     streamStatus: string | null;
     apiRetry: ApiRetry | null;
@@ -71,6 +72,7 @@
     messages,
     pendingToolIds,
     streaming,
+    busy,
     compacting,
     streamStatus,
     apiRetry,
@@ -121,7 +123,7 @@
     item.role === "assistant" &&
     !item.ephemeral &&
     !!item.text.trim() &&
-    (visible[index + 1] ? visible[index + 1].role === "user" : !streaming);
+    (visible[index + 1] ? visible[index + 1].role === "user" : !busy);
 
   interface Picked {
     text: string;
