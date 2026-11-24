@@ -33,7 +33,9 @@ JOINED_KINDS = frozenset({"assistant_text", "thinking"})
 
 STOP_GRACE = 15.0
 
-RELOADS = {"reload-plugins": "reload_plugins", "reload-skills": "reload_skills"}
+PLUGIN_RELOAD = "reload-plugins"
+
+RELOADS = {PLUGIN_RELOAD: "reload_plugins", "reload-skills": "reload_skills"}
 
 RELOAD_COUNTS = {"plugins": "plugins", "commands": "commands", "agents": "agents", "mcp_servers": "mcpServers"}
 
@@ -88,6 +90,7 @@ class LiveSession:
         self._health = None
         self._background = {}
         self._owned = {}
+        self._crons = 0
         self._unplugged = set()
         self._runs = {}
         self._announced = object()
@@ -152,6 +155,10 @@ class LiveSession:
     @property
     def tasks_alive(self):
         return bool(self._background)
+
+    @property
+    def keeps_process(self):
+        return self.working or self._crons > 0
 
     @property
     def attached(self):
@@ -352,6 +359,7 @@ class LiveSession:
 
     def _resident_changed(self):
         if not self.resident_alive:
+            self._crons = 0
             self._end_background()
             self._reassert_meta()
             self._wake_tail()
@@ -419,6 +427,8 @@ class LiveSession:
             if answer is None:
                 report = {"command": command, "resident": True, "failed": True}
             else:
+                if subtype == RELOADS[PLUGIN_RELOAD]:
+                    await self._resident.prune_servers()
                 counts = {name: len(answer[key]) for name, key in RELOAD_COUNTS.items() if isinstance(answer.get(key), list)}
                 report = {"command": command, "resident": True, **counts, "errors": answer.get("error_count") or 0}
         await self._emit({"type": "reloaded", **report})
@@ -427,6 +437,7 @@ class LiveSession:
     async def release_resident(self, reason: str):
         self._cancel_cooldown()
         self._resident = None
+        self._crons = 0
         self._end_background()
         await persistent_sessions.pool.drop(self.channel, reason)
         self._publish_activity(self.activity)
@@ -446,7 +457,7 @@ class LiveSession:
             self._cooldown = None
 
     def _schedule_cooldown(self):
-        if not self.holds_process or self._sinks or self.working:
+        if not self.holds_process or self._sinks or self.keeps_process:
             return
         self._cancel_cooldown()
         self._cooldown = asyncio.create_task(self._cooldown_after(persistent_sessions.grace()))
@@ -457,7 +468,7 @@ class LiveSession:
         except asyncio.CancelledError:
             return
         self._cooldown = None
-        if not self._sinks and not self.working:
+        if not self._sinks and not self.keeps_process:
             await self.release_process("idle past the grace period")
 
     async def release_process(self, reason: str):
@@ -485,6 +496,10 @@ class LiveSession:
             gone = [tool_use_id for tool_use_id, running in self._background.items() if running.get("task") and running["task"] not in alive]
             for tool_use_id in gone:
                 await self._emit({"type": "agent_result", "id": tool_use_id, "status": None})
+            return None
+        if kind == "session_crons":
+            self._crons = event.get("count") or 0
+            self._schedule_cooldown()
             return None
         if kind == "commands":
             cli_info.refresh_later(self.state.account, shared=True)
@@ -1222,7 +1237,7 @@ class SessionRegistry:
     def _sweep(self):
         now = self._clock()
         for channel, session in list(self._sessions.items()):
-            if session.working or session.attached:
+            if session.keeps_process or session.attached:
                 self._idle_since.pop(channel, None)
                 continue
             since = self._idle_since.setdefault(channel, now)
@@ -1234,7 +1249,7 @@ class SessionRegistry:
     def busy_channels(self):
         return {
             channel for channel, session in self._sessions.items()
-            if session.working or session.attached
+            if session.keeps_process or session.attached
         }
 
     async def trim(self, keep):
@@ -1262,7 +1277,7 @@ class SessionRegistry:
             idle = sorted(
                 (
                     session for session in self._sessions.values()
-                    if session.holds_process and not session.working and session.channel != keep
+                    if session.holds_process and not session.keeps_process and session.channel != keep
                     and (session.agent is None or not session.attached)
                 ),
                 key=lambda session: session.used_at,

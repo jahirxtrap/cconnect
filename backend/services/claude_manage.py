@@ -37,6 +37,7 @@ _CLONE_TIMEOUT = 120
 _REPORT_TIMEOUT = 60
 _ACTION_TIMEOUT = 300
 _VERSION_REFUSED = "engine-range-unsatisfied"
+_SESSION_MARKERS = frozenset({"CLAUDECODE", "CLAUDE_CODE_CHILD_SESSION"})
 
 
 def _cli() -> str | None:
@@ -49,10 +50,11 @@ def _exec(
     cli = _cli()
     if not cli:
         raise OSError("No CLI available")
+    outside = {name: value for name, value in (os.environ if env is None else env).items() if name not in _SESSION_MARKERS}
     return subprocess.run(
         [cli, *args],
         input=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=timeout, cwd=cwd, env=env,
+        timeout=timeout, cwd=cwd, env=outside,
     )
 
 
@@ -76,27 +78,42 @@ def _report(args: list[str], cwd: str | None = None, timeout: int = _REPORT_TIME
     return data if isinstance(data, dict) else None
 
 
-def _update(plugin: str, flags: list[str], cwd: str | None) -> dict:
-    report = _report(["plugin", UPDATE, plugin, *flags], cwd, _ACTION_TIMEOUT)
-    if report is None:
-        return _run(["plugin", UPDATE, plugin, *flags], cwd=cwd)
+def _plugin_command(args: list[str], cwd: str | None) -> dict:
+    try:
+        result = _exec([*args, "--json"], _ACTION_TIMEOUT, cwd, None)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"ok": False, "message": str(exc)}
+    try:
+        report = json.loads(result.stdout)
+    except ValueError:
+        report = None
+    if not isinstance(report, dict):
+        return {"ok": result.returncode == 0, "message": (result.stdout + result.stderr).strip()}
+    done = report.get("outcome") == "ok"
+    printed = result.stderr.strip() if report.get("commandPrinted") or report.get("commandFailed") else ""
     return {
-        "ok": report.get("outcome") == "ok",
+        "ok": done or bool(report.get("alreadyInGoalState")),
         "message": report.get("message") or "",
-        "changed": report.get("updateOutcome") != _UP_TO_DATE,
+        "changed": done and report.get("updateOutcome") != _UP_TO_DATE,
+        **({"printed": printed} if printed else {}),
     }
 
 
-def version_refused() -> set[str]:
+def _listed() -> list[dict] | None:
     try:
         listed = json.loads(_exec(["plugin", "list", "--json"], _REPORT_TIMEOUT, None, None).stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
-        return set()
+        return None
+    if not isinstance(listed, list):
+        return None
+    return [entry for entry in listed if isinstance(entry, dict) and isinstance(entry.get("id"), str)]
+
+
+def version_refused() -> set[str]:
     return {
         entry["id"]
-        for entry in (listed if isinstance(listed, list) else ())
-        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
-        and any(isinstance(detail, dict) and detail.get("type") == _VERSION_REFUSED for detail in entry.get("errorDetails") or ())
+        for entry in _listed() or ()
+        if any(isinstance(detail, dict) and detail.get("type") == _VERSION_REFUSED for detail in entry.get("errorDetails") or ())
     }
 
 
@@ -144,11 +161,9 @@ def plugin_action(action: str, plugin: str) -> dict:
     if action == "uninstall" and plugin.partition("@")[2] == claude_assets.LOCAL_MARKETPLACE:
         return _remove_local(plugin)
     if action == "install":
-        return _run(["plugin", action, plugin])
+        return _plugin_command(["plugin", action, plugin], None)
     flags, cwd = _plugin_place(plugin)
-    if action == UPDATE:
-        return _update(plugin, flags, cwd)
-    return _run(["plugin", action, plugin, *flags], cwd=cwd)
+    return _plugin_command(["plugin", action, plugin, *flags], cwd)
 
 
 def _review(folder: Path) -> dict | None:
@@ -227,16 +242,17 @@ def add_local_plugin(source: str) -> dict:
     target = claude_assets.SKILLS_DIR / name
     if target.exists():
         return {"ok": False, "message": f"{name} is already installed"}
-    review = _review(folder)
-    if review is None:
-        return {"ok": False, "message": "the plugin could not be validated"}
-    if review["errors"]:
-        return {"ok": False, "message": "\n".join(review["errors"])}
     try:
         shutil.copytree(folder, target, ignore=shutil.ignore_patterns(*_COPY_SKIPS))
     except OSError as exc:
         return {"ok": False, "message": str(exc)}
-    return {"ok": True, "message": ""}
+    plugin = claude_assets.plugin_id({"name": name, "marketplace": claude_assets.LOCAL_MARKETPLACE})
+    loaded = next((entry for entry in _listed() or () if entry["id"] == plugin), None)
+    errors = [str(error) for error in (loaded or {}).get("errors") or []]
+    if loaded is None or errors:
+        shutil.rmtree(target, ignore_errors=True)
+        return {"ok": False, "message": "\n".join(errors) or "the plugin could not be validated"}
+    return {"ok": True, "message": "", "notes": [str(note) for note in loaded.get("notes") or []]}
 
 
 def _clone_url(source: str) -> str | None:
@@ -339,34 +355,39 @@ async def ensure_official_marketplace() -> None:
     await asyncio.to_thread(marketplace_action, "add", OFFICIAL_MARKETPLACE)
 
 
-def _mcp_add(name: str, transport: str, target: str, args: list[str], env: list[str], headers: dict[str, str]) -> dict:
+def _add_json(name: str, config: dict) -> dict:
+    return _run(["mcp", "add-json", "-s", "user", name, "-"], stdin=json.dumps(config))
+
+
+def _texts(values: dict) -> dict[str, str]:
+    return {str(key): str(value) for key, value in values.items()}
+
+
+def _mcp_add(name: str, transport: str, target: str, args: list[str], env: dict, headers: dict) -> dict:
     if not name or not target:
         return {"ok": False, "message": "name and command/url are required"}
     if transport in _MCP_REMOTE:
-        flags = [arg for key, value in headers.items() for arg in ("--header", f"{key}: {value}")]
-        return _run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags])
-    if not all(_ENV_ENTRY.match(entry) for entry in env):
-        return {"ok": False, "message": "environment variables go one per line as KEY=value"}
-    flags = [arg for entry in env for arg in ("-e", entry)]
-    return _run(["mcp", "add", "-s", "user", name, *flags, "--", target, *args])
+        return _add_json(name, {"type": transport, "url": target, **({"headers": _texts(headers)} if headers else {})})
+    return _add_json(name, {"type": "stdio", "command": target, "args": args, **({"env": _texts(env)} if env else {})})
 
 
 def mcp_add(
     name: str, target: str, transport: str = "stdio", auth: dict | None = None, env: list[str] | None = None
 ) -> dict:
     if transport in _MCP_REMOTE:
-        return _mcp_add(name, transport, target, [], [], accounts.auth_headers(auth or {}))
+        return _mcp_add(name, transport, target, [], {}, accounts.auth_headers(auth or {}))
     command, *args = target.split() or [""]
     entries = [entry.strip() for entry in env or () if entry.strip()]
-    return _mcp_add(name, transport, command, args, entries, {})
+    if not all(_ENV_ENTRY.match(entry) for entry in entries):
+        return {"ok": False, "message": "environment variables go one per line as KEY=value"}
+    return _mcp_add(name, transport, command, args, dict(entry.split("=", 1) for entry in entries), {})
 
 
 def mcp_add_config(name: str, config: dict) -> dict:
     if config.get("url"):
         transport = config.get("type") if config.get("type") in _MCP_REMOTE else _MCP_REMOTE[0]
-        return _mcp_add(name, transport, config["url"], [], [], config.get("headers") or {})
-    env = [f"{key}={value}" for key, value in (config.get("env") or {}).items()]
-    return _mcp_add(name, "stdio", config.get("command") or "", config.get("args") or [], env, {})
+        return _mcp_add(name, transport, config["url"], [], {}, config.get("headers") or {})
+    return _mcp_add(name, "stdio", config.get("command") or "", config.get("args") or [], config.get("env") or {}, {})
 
 
 def mcp_remove(name: str) -> dict:
@@ -402,7 +423,7 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
         cfg = disabled_mcp_servers().get(name)
         if cfg is None:
             return {"ok": False, "message": "server is not disabled"}
-        result = _run(["mcp", "add-json", "-s", "user", name, json.dumps(cfg)])
+        result = _add_json(name, cfg)
         if result["ok"]:
             _enable(name)
         return result

@@ -120,7 +120,7 @@
     {/if}
   {/if}
   {#if data.reason}
-    <p class="mt-1 text-body-sm wrap-anywhere text-on-surface-variant">{data.reason}</p>
+    <p class="mt-1 text-body-sm wrap-anywhere whitespace-pre-line text-on-surface-variant">{data.reason}</p>
   {/if}
 
   {#if data.resolved === null}

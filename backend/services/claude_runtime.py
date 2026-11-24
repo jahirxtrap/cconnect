@@ -586,17 +586,33 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
     return events
 
 
+class _Unanswered(Exception):
+    pass
+
+
 def _build_can_use_tool(
     ask_user: Callable[[dict], Awaitable[dict]],
     render_site: Optional[Callable[[str, str, dict], Awaitable[Optional[dict]]]] = None,
 ):
     from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
 
+    async def ask(payload: dict) -> dict:
+        response = await ask_user(payload)
+        if response.get("behavior") == "deny":
+            raise _Unanswered(response.get("message") or "")
+        return response
+
     async def _can_use_tool(tool_name: str, tool_input: dict, ctx) -> Any:
+        try:
+            return await decide(tool_name, tool_input, ctx)
+        except _Unanswered as refusal:
+            return PermissionResultDeny(message=str(refusal))
+
+    async def decide(tool_name: str, tool_input: dict, ctx) -> Any:
         if tool_name == "AskUserQuestion" and isinstance(tool_input, dict):
             qs = [q for q in (tool_input.get("questions") or []) if isinstance(q, dict)]
             if mods.hot_reload(tool_input):
-                response = await ask_user(mods.hot_reload_ask(qs[0] if qs else {}))
+                response = await ask(mods.hot_reload_ask(qs[0] if qs else {}))
                 return PermissionResultAllow(updated_input=mods.hot_reload_answer(tool_input, qs, response.get("option_id")))
             source = (tool_input.get("metadata") or {}).get("source") if isinstance(tool_input.get("metadata"), dict) else None
             site_props = {"tool": tool_name, "questions": qs, **({"metadataSource": source} if source else {})}
@@ -617,7 +633,7 @@ def _build_can_use_tool(
                     "tree": drawn["tree"],
                     "client_modules": drawn.get("client_modules") or {},
                 }
-            response = await ask_user(dialog)
+            response = await ask(dialog)
             if response.get("chat"):
                 return PermissionResultDeny(message=DECLINE_MESSAGE)
             answers, annotations = answers_from_values(qs, response.get("values") or {})
@@ -635,7 +651,7 @@ def _build_can_use_tool(
             if getattr(suggestion, "destination", None) == "localSettings"
         ]
         always = [{"id": "allow_always"}] if persist and tool_name != "ExitPlanMode" else []
-        response = await ask_user({
+        response = await ask({
             "kind": "permission",
             "tool_name": _display_tool_name(tool_name),
             "tool_use_id": getattr(ctx, "tool_use_id", None),
@@ -673,6 +689,10 @@ _NO_BACKGROUND_ENV = {
     "CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND": "1",
 }
 
+_HOST_ENV = {"CLAUDE_CODE_DISABLE_DEFERRED_TOOL_RESUME": "1"}
+
+_FULL_PROMPT_ENV = {"CLAUDE_CODE_SIMPLE_SYSTEM_PROMPT": "0"}
+
 
 def _window_env(account_id: Optional[str], model: Optional[str]) -> dict[str, str]:
     if not cli_info.provider_model(model, account_id):
@@ -689,11 +709,13 @@ def _window_env(account_id: Optional[str], model: Optional[str]) -> dict[str, st
 def _cli_env(account_id: Optional[str], kept: Optional[bool] = None, model: Optional[str] = None) -> dict[str, str]:
     from services import accounts
 
-    env = dict(accounts.env_for(account_id))
+    env = {**accounts.env_for(account_id), **_HOST_ENV}
     if not os.environ.get("HOME") and not env.get("HOME"):
         env["HOME"] = str(Path.home())
     if not (persistent_sessions.enabled() if kept is None else kept):
         env.update(_NO_BACKGROUND_ENV)
+    if accounts.context_scope(account_id)["preset"]:
+        env.update(_FULL_PROMPT_ENV)
     env.update(_window_env(account_id, model))
     return env
 
@@ -1018,8 +1040,10 @@ async def run_prompt(
         overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
     hooks_map: dict[str, Any] = {
-        "PreToolUse": [HookMatcher(matcher=None, hooks=[_background_guard(resident is not None), _secrets_guard(unlocked), _block_stale_shared])]
+        "PreToolUse": [HookMatcher(matcher=None, hooks=[_background_guard(resident is not None), _secrets_guard(unlocked), _block_stale_shared], on_failure="block")]
     }
+    if resident is not None:
+        hooks_map["Stop"] = [HookMatcher(matcher=None, hooks=[resident.report_crons])]
     loop = asyncio.get_running_loop() if emit is not None else None
 
     async def _render_site(component: str, instance_id: str, props: dict) -> Optional[dict]:
@@ -1594,7 +1618,7 @@ async def ask_side_question(
     tools = scope["tools"]
     if tools is not True:
         options_kwargs["tools"] = tools if isinstance(tools, list) else []
-    hooks = [HookMatcher(matcher=None, hooks=[_background_guard(persistent_sessions.enabled()), _secrets_guard(_locked), _block_stale_shared])]
+    hooks = [HookMatcher(matcher=None, hooks=[_background_guard(persistent_sessions.enabled()), _secrets_guard(_locked), _block_stale_shared], on_failure="block")]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
         hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))

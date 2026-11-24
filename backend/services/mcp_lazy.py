@@ -80,6 +80,7 @@ class Spec:
     env: dict[str, str]
     entry: dict[str, Any]
     key: str
+    plugin: Optional[str] = None
 
 
 @dataclass
@@ -152,7 +153,7 @@ def _specs(cwd: str, env: dict[str, str]) -> list[Spec]:
         key = hashlib.sha256(json.dumps([server.name, *shape, plugin], sort_keys=True).encode()).hexdigest()
         command, args, own = launch
         entry = {name: cfg[name] for name in _ENTRY_KEYS if name in cfg}
-        specs.append(Spec(server.name, command, tuple(args), {**plugin, **own}, entry, key))
+        specs.append(Spec(server.name, command, tuple(args), {**plugin, **own}, entry, key, (server.plugin or {}).get("name")))
     return specs
 
 
@@ -587,6 +588,13 @@ class LazyServers:
     def apply(self, options: Any) -> Any:
         entries = {served.spec.name: served.entry for served in self._served}
         return dataclasses.replace(options, mcp_servers={**entries, **(options.mcp_servers or {})})
+
+    async def prune(self) -> list[str]:
+        enabled = {plugin["name"] for plugin in await asyncio.to_thread(claude_assets.list_plugins) if plugin["enabled"]}
+        gone = [item for item in self._served if item.spec.plugin is not None and item.spec.plugin not in enabled]
+        self._served = [item for item in self._served if item not in gone]
+        await asyncio.gather(*(item.close() for item in gone), return_exceptions=True)
+        return [item.spec.name for item in gone]
 
     async def close(self) -> None:
         served, self._served = self._served, []

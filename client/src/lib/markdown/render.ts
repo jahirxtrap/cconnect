@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import cjkFriendly from "markdown-it-cjk-friendly";
 import { CCONNECT_LANG, parseCconnectBlock, type CconnectBlock } from "./cconnectBlock";
 import { githubHtml } from "./githubHtml";
 
@@ -36,10 +37,47 @@ const LIST_OPEN = new Set(["bullet_list_open", "ordered_list_open"]);
 const LIST_CLOSE = new Set(["bullet_list_close", "ordered_list_close"]);
 const PARAGRAPH = new Set(["paragraph_open", "paragraph_close"]);
 
+const BACKSLASH = 0x5c;
+const WINDOWS_PATH_RE = /^[("'[]*(?:[A-Za-z]:\\|\\\\[^\\\s]|\.{1,2}\\)/;
+const TOKEN_HEAD_RE = /\S*$/;
+const TOKEN_TAIL_RE = /^\S*/;
+const CELL_BREAK_RE = /<br\s*\/?>/i;
+const CELL_OPEN = new Set(["td_open", "th_open"]);
+const CELL_CLOSE = new Set(["td_close", "th_close"]);
+
 const markerOf = (token: Token): string => String(token.meta?.marker ?? "");
 
 const engine = (html: boolean, breaks: boolean) => {
-  const instance = new MarkdownIt({ html, linkify: true, breaks });
+  const instance = new MarkdownIt({ html, linkify: true, breaks }).use(cjkFriendly);
+
+  instance.inline.ruler.before("escape", "windows_path", (state, silent) => {
+    if (state.src.charCodeAt(state.pos) !== BACKSLASH) return false;
+    const head = TOKEN_HEAD_RE.exec(state.src.slice(0, state.pos))?.[0] ?? "";
+    const tail = TOKEN_TAIL_RE.exec(state.src.slice(state.pos))?.[0] ?? "";
+    if (!WINDOWS_PATH_RE.test(head + tail)) return false;
+    if (!silent) state.pending += "\\";
+    state.pos++;
+    return true;
+  });
+
+  instance.core.ruler.push("cell_breaks", (state) => {
+    let inCell = false;
+    for (const token of state.tokens) {
+      if (CELL_OPEN.has(token.type)) inCell = true;
+      else if (CELL_CLOSE.has(token.type)) inCell = false;
+      else if (inCell && token.type === "inline" && token.children) {
+        token.children = token.children.flatMap((child) =>
+          child.type !== "text"
+            ? [child]
+            : child.content.split(CELL_BREAK_RE).flatMap((part, index) => {
+                const text = Object.assign(new state.Token("text", "", 0), { content: part });
+                return index === 0 ? [text] : [new state.Token("hardbreak", "br", 0), text];
+              }),
+        );
+      }
+    }
+    return true;
+  });
 
   instance.core.ruler.push("task_markers", (state) => {
     const tokens = state.tokens;

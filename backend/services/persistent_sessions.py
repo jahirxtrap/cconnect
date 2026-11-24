@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from typing import Any, Awaitable, Callable, Optional
 
 import psutil
@@ -14,6 +15,7 @@ CLOSE_TIMEOUT = 20.0
 OWN_TURN_TIMEOUT = 300.0
 _MEGABYTE = 1024 * 1024
 TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
+UNATTENDED = "Nobody can answer this now: no turn is running in this chat, so there is no one to ask."
 
 
 class TurnBinding:
@@ -55,6 +57,10 @@ class PersistentSession:
     def unbind(self) -> None:
         self.turn = None
 
+    async def report_crons(self, input_data, tool_use_id, context) -> dict:
+        await self._notify({"type": "session_crons", "count": len((input_data or {}).get("session_crons") or [])})
+        return {}
+
     async def emit(self, event: dict) -> None:
         turn = self.turn
         if turn is not None and turn.emit is not None:
@@ -63,7 +69,7 @@ class PersistentSession:
     async def ask_user(self, payload: dict) -> dict:
         turn = self.turn
         if turn is None or turn.ask_user is None:
-            return {"behavior": "deny", "message": "no client attached"}
+            return {"behavior": "deny", "message": UNATTENDED}
         return await turn.ask_user(payload)
 
     def wanted(self) -> dict:
@@ -219,6 +225,13 @@ class PersistentSession:
 
     async def reload(self, subtype: str, hold: bool = False) -> Optional[dict]:
         return await self.request(subtype, **({"hold_on_cache_impact": True} if hold else {}))
+
+    async def prune_servers(self) -> None:
+        if self.lazy is None or self.client is None:
+            return
+        for name in await self.lazy.prune():
+            with suppress(Exception):
+                await self.client.reconnect_mcp_server(name)
 
     async def retune(self, changes: dict) -> None:
         """Switch the running CLI's model or permission mode; it answers each with a line of its own, so a turn must be bound."""

@@ -2063,12 +2063,9 @@ def _normalize(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     rc = tool_result_by_id.get(bid or "")
-                    if isinstance(rc, list):
-                        rtext = " ".join(b.get("text", "") for b in rc if isinstance(b, dict))
-                    elif isinstance(rc, str):
-                        rtext = rc
-                    else:
-                        rtext = ""
+                    if rc is None:
+                        continue
+                    rtext = _flatten_result_content(rc)
                     if "redirect" in rtext:
                         resolved = "different"
                     elif "approved" in rtext:
