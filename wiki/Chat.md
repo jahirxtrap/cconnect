@@ -34,13 +34,15 @@ arrive as mentions it can open directly. Pasting works without clicking the
 box first: files and images become attachments, text goes into the message.
 
 **Rewind** takes a conversation back to an earlier point. Pick the moment,
-preview exactly what would change on disk (`+added −removed • files`), and
+preview what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
-together. The conversation goes back with your next message: until then the
-chat shows a notice with **Undo**, which brings the rest of it back and leaves
-the files as Rewind left them. **Earlier points** at the end of the list
-reaches the stretches before each compaction; Claude Code cannot roll those
-back, so they only fork.
+together. What a terminal command changed is not part of a checkpoint, so after
+one the preview says those changes are unknown, and a notice tells you when some
+files could not be put back. The conversation goes back with your next message:
+until then the chat shows a notice with **Undo**, which brings the rest of it
+back and leaves the files as Rewind left them. **Earlier points** at the end of
+the list reaches the stretches before each compaction; Claude Code cannot roll
+those back, so they only fork.
 
 **Fork** copies a chat into a new one and leaves the original as it is: the
 whole conversation from the chat's menu, or up to a point from Rewind or from
@@ -77,7 +79,9 @@ Server settings chooses how many chats and ACP agents may keep one at once and h
 long each waits after the last device closes it, and you can close it yourself
 from the chat's header. Whatever runs in the
 background is listed under **Running** in that header, each task with a button to
-stop it, and the session stays open while any of it is still working.
+stop it, and the session stays open while any of it is still working. A `/loop` or
+a scheduled task keeps it open too, even with the app closed, and what it asks
+Claude shows in the chat as **Scheduled message**.
 
 Model, effort and the effort subagents run at, permission mode, whether Claude may
 write outside the chat's working folders, how much of each turn you see, when the
