@@ -298,7 +298,21 @@ def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict 
         "engine": _engine_range(manifest),
         "local": marketplace == LOCAL_MARKETPLACE,
         "icon": asset_icons.file_version(icon) if icon else None,
+        "requires": _requires(manifest, marketplace),
     }
+
+
+def _requires(manifest: dict, marketplace: str) -> list[dict]:
+    named = (
+        (item.get("name") if isinstance(item, dict) else item, optional)
+        for key, optional in (("dependencies", False), ("optionalDependencies", True))
+        for item in (manifest.get(key) if isinstance(manifest.get(key), list) else ())
+    )
+    return [
+        {"id": name if "@" in name else plugin_id({"name": name, "marketplace": marketplace}), "optional": optional}
+        for name, optional in named
+        if isinstance(name, str) and name
+    ]
 
 
 def _local_plugins(taken: set[str], enabled: dict) -> list[dict]:
@@ -474,6 +488,10 @@ def _hook_entries(config: dict, source: str, plugin: dict | None = None) -> list
                     "command": hook.get("command"),
                     "prompt": hook.get("prompt"),
                     "url": hook.get("url"),
+                    "server": hook.get("server"),
+                    "tool": hook.get("tool"),
+                    "input": hook.get("input") if isinstance(hook.get("input"), dict) else None,
+                    "on_failure": hook.get("onFailure"),
                     "timeout": hook.get("timeout"),
                     "source": source,
                     "plugin": plugin_id(plugin) if plugin else None,

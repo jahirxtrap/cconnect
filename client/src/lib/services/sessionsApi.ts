@@ -32,6 +32,7 @@ export interface RewindPoint {
   rewindId: string;
   text: string;
   forkOnly: boolean;
+  untracked: boolean;
 }
 
 export interface RewindPoints {
@@ -45,6 +46,7 @@ export interface RewindPreview {
   filesChanged: string[];
   insertions: number;
   deletions: number;
+  skippedLinks: number;
 }
 
 interface RewindWire {
@@ -53,6 +55,7 @@ interface RewindWire {
   files_changed?: string[];
   insertions?: number;
   deletions?: number;
+  skipped_links?: number;
 }
 
 const toPreview = (data: RewindWire | null): RewindPreview | null =>
@@ -62,6 +65,7 @@ const toPreview = (data: RewindWire | null): RewindPreview | null =>
     filesChanged: data.files_changed ?? [],
     insertions: data.insertions ?? 0,
     deletions: data.deletions ?? 0,
+    skippedLinks: data.skipped_links ?? 0,
   };
 
 export const createSessionsApi = (http: HttpClient) => ({
@@ -117,7 +121,10 @@ export const createSessionsApi = (http: HttpClient) => ({
   },
 
   async checkpoints(sessionId: string, project: string, until: string | null = null): Promise<RewindPoints> {
-    const data = await http.get<{ points?: Array<{ id?: string; rewind_id?: string; text?: string }>; earlier?: string | null }>(
+    const data = await http.get<{
+      points?: Array<{ id?: string; rewind_id?: string; text?: string; untracked?: boolean }>;
+      earlier?: string | null;
+    }>(
       `/sessions/${sessionId}/checkpoints`,
       until ? { project, until } : { project },
     );
@@ -125,7 +132,13 @@ export const createSessionsApi = (http: HttpClient) => ({
     return {
       points: points
         .filter((point) => point.id && point.rewind_id)
-        .map((point) => ({ id: point.id!, rewindId: point.rewind_id!, text: point.text ?? "", forkOnly: until !== null })),
+        .map((point) => ({
+          id: point.id!,
+          rewindId: point.rewind_id!,
+          text: point.text ?? "",
+          forkOnly: until !== null,
+          untracked: point.untracked === true,
+        })),
       earlier: data?.earlier ?? null,
     };
   },

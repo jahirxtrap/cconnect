@@ -114,6 +114,7 @@ const hookFields = (event: EventOf<"hook">): Partial<ChatMessage> => ({
   toolName: joined(event.event, event.matcher),
   result: event.level,
   labelOnly: !event.text,
+  rawOutput: event.raw,
 });
 
 const compactOf = ({ trigger, preTokens, postTokens, summary }: CompactData): CompactData => ({
@@ -393,6 +394,7 @@ export class ChatState {
   rewindTarget = $state<RewindPoint | null>(null);
   rewindPreview = $state<RewindPreview | null>(null);
   rewindBusy = $state(false);
+  rewindShortfall = $state<RewindPreview | null>(null);
   pendingInput = $state<string | null>(null);
   readonly shellHistory = $derived.by(() => [
     ...new Set(
@@ -1439,6 +1441,7 @@ export class ChatState {
     await this.#reloadConversation();
     this.rewindTarget = null;
     this.rewindPreview = null;
+    this.rewindShortfall = result.error || result.skippedLinks ? result : null;
     this.rewindBusy = false;
     this.restoreComposer(point.text);
     return true;
@@ -2272,6 +2275,7 @@ export class ChatState {
         toolBlockedBy: item.toolBlockedBy,
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
+        rawOutput: item.rawOutput,
         result: item.result,
         resume: item.resume,
         images: this.#imageUrls(item, sessionId, projectKey),

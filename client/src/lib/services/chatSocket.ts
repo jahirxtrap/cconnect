@@ -152,7 +152,7 @@ export type ServerEvent =
       toolUses: number | null;
     }
   | { type: "thinking_tokens"; tokens: number }
-  | { type: "hook"; event: string | null; matcher: string | null; text: string; level: string | null }
+  | { type: "hook"; event: string | null; matcher: string | null; text: string; level: string | null; raw: boolean }
   | { type: "notification"; summary: string; status: string | null }
   | { type: "notice"; name: string | null; text: string; level: string | null }
   | { type: "mods"; state: ModState }
@@ -1032,6 +1032,7 @@ export class ChatSocket {
           matcher: event.matcher ?? null,
           text: event.text ?? "",
           level: event.level ?? null,
+          raw: event.raw === true,
         };
       case "todos":
         return {

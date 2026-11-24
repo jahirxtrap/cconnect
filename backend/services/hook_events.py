@@ -19,16 +19,17 @@ _HELD_BACK = {
     "hook_blocking_error": "blockingError",
     "hook_stopped_continuation": "message",
 }
+_FAILURES = frozenset({"hook_non_blocking_error", "hook_error_during_execution"})
 
 
-def _row(event: Optional[str], name: Optional[str], text: Any, level: Optional[str] = None) -> Optional[dict]:
+def _row(event: Optional[str], name: Optional[str], text: Any, level: Optional[str] = None, raw: bool = False) -> Optional[dict]:
     body = str(text or "").strip()
     if not body:
         return None
     event = event or (name.split(":", 1)[0] if name else None)
     lead = f"{event}:"
     matcher = name[len(lead):] if name and event and name.startswith(lead) else None
-    return {"type": "hook", "event": event, "matcher": matcher or None, "text": body, "level": level}
+    return {"type": "hook", "event": event, "matcher": matcher or None, "text": body, "level": level, "raw": raw}
 
 
 def _output(stdout: Any) -> dict:
@@ -50,7 +51,7 @@ def from_response(data: dict) -> list[dict]:
     if outcome == "error":
         if data.get("exit_code") == 2 and event == _TOOL_GATE:
             return []
-        rows = [_row(event, name, data.get("stderr") or data.get("output"), WARNING)]
+        rows = [_row(event, name, data.get("stderr") or data.get("output"), WARNING, raw=True)]
     elif outcome == "success":
         output = _output(data.get("stdout"))
         rows = [_row(event, name, output.get("systemMessage"))]
@@ -75,7 +76,7 @@ def from_attachment(attachment: dict) -> Optional[dict]:
     value = attachment.get(_HELD_BACK[kind])
     if isinstance(value, dict):
         value = value.get("blockingError")
-    return _row(event, name, _COMMAND_LEAD.sub("", str(value or "")), WARNING)
+    return _row(event, name, _COMMAND_LEAD.sub("", str(value or "")), WARNING, raw=kind in _FAILURES)
 
 
 def from_feedback(text: str) -> Optional[dict]:

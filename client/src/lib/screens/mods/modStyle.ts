@@ -83,9 +83,10 @@ const WEIGHTS: Record<string, number> = { regular: 400, medium: 500, semibold: 6
 const TRUNCATE_END = new Set(["end", "truncate", "truncate-end"]);
 const TRUNCATE_START = new Set(["truncate-start"]);
 const TRUNCATE_MIDDLE = new Set(["middle", "truncate-middle"]);
+const CLIP = "clip";
 const PERCENT = /^\d{1,3}%$/;
 
-export type Wrap = "wrap" | "end" | "start" | "middle";
+export type Wrap = "wrap" | "end" | "start" | "middle" | "clip";
 
 export type ButtonRow = "chips" | "mixed" | null;
 
@@ -130,6 +131,8 @@ const borderColorOf = (props: Props): string => {
   return own ?? "var(--c-outline)";
 };
 
+const scrolls = (props: Props): boolean => props.overflowX === "scroll";
+
 export const unpadded = (props: Props): Props => {
   const { paddingX: _x, paddingLeft: _left, paddingRight: _right, padding, ...rest } = props;
   return padding === undefined ? rest : { ...rest, paddingY: rest.paddingY ?? padding };
@@ -145,8 +148,9 @@ export const boxStyle = (props: Props, buttonRow: ButtonRow): string => {
     ["flex-direction", keyword(props.flexDirection) ?? "row"],
     ["position", props.position === "absolute" ? "absolute" : "relative"],
     ["z-index", props.position === "absolute" ? 1 : null],
-    ["flex-wrap", keyword(props.flexWrap) ?? (buttonRow ? "wrap" : null)],
+    ["flex-wrap", keyword(props.flexWrap) ?? (scrolls(props) ? "nowrap" : buttonRow ? "wrap" : null)],
     ...KEYWORDS.map(([key, css]): [string, string | number | null] => [css, keyword(props[key])]),
+    ["overflow-x", scrolls(props) ? "auto" : null],
     ["column-gap", across],
     ["row-gap", spaceOf(props.rowGap, "y") ?? (buttonRow ? CHIP_GAP : spaceOf(props.gap, "y"))],
     ["margin", EDGES.map(([, edge, axis]) => sideOf(props, "margin", edge, axis)).join(" ")],
@@ -194,7 +198,19 @@ export const wrapOf = (props: Props): Wrap => {
   if (TRUNCATE_END.has(wrap)) return "end";
   if (TRUNCATE_START.has(wrap)) return "start";
   if (TRUNCATE_MIDDLE.has(wrap)) return "middle";
-  return "wrap";
+  return wrap === CLIP ? "clip" : "wrap";
+};
+
+export const clampStyle = (props: Props): string => {
+  const lines = typeof props.maxLines === "number" && Number.isInteger(props.maxLines) && props.maxLines > 0 ? props.maxLines : null;
+  return lines === null
+    ? ""
+    : rules([
+        ["display", "-webkit-box"],
+        ["-webkit-box-orient", "vertical"],
+        ["-webkit-line-clamp", lines],
+        ["overflow", "hidden"],
+      ]);
 };
 
 export const middleCut = (text: string, room: number): string => {

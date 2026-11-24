@@ -2802,6 +2802,10 @@
             }
           ],
           "default": null
+        },
+        "raw": {
+          "default": false,
+          "type": "boolean"
         }
       },
       "required": [

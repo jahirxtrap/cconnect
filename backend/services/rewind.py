@@ -64,6 +64,7 @@ def _normalize(response: dict[str, Any]) -> dict[str, Any]:
         "files_changed": response.get("filesChanged") or [],
         "insertions": response.get("insertions") or 0,
         "deletions": response.get("deletions") or 0,
+        "skipped_links": response.get("skippedLinks") or 0,
     }
 
 
@@ -72,7 +73,7 @@ async def preview(cwd: str, session_id: str, user_message_id: str) -> dict[str, 
         return _normalize(await _rewind_control(cwd, session_id, user_message_id, dry_run=True))
     except Exception as exc:
         logger.error(f"rewind preview failed: {type(exc).__name__}: {exc}")
-        return {"can_rewind": False, "error": str(exc), "files_changed": [], "insertions": 0, "deletions": 0}
+        return _normalize({"error": str(exc)})
 
 
 async def rewind_code(cwd: str, session_id: str, user_message_id: str) -> dict[str, Any]:
@@ -80,4 +81,4 @@ async def rewind_code(cwd: str, session_id: str, user_message_id: str) -> dict[s
         return _normalize(await _rewind_control(cwd, session_id, user_message_id, dry_run=False))
     except Exception as exc:
         logger.error(f"rewind failed: {type(exc).__name__}: {exc}")
-        return {"can_rewind": False, "error": str(exc), "files_changed": [], "insertions": 0, "deletions": 0}
+        return _normalize({"error": str(exc)})

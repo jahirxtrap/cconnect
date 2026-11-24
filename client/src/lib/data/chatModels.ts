@@ -279,6 +279,7 @@ export interface ChatMessage {
   toolBlockedBy: string | null;
   sourceIndex: number;
   labelOnly: boolean;
+  rawOutput: boolean;
   result: string | null;
   resume: Resume | null;
   ephemeral: boolean;
@@ -529,6 +530,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   toolBlockedBy: null,
   sourceIndex: -1,
   labelOnly: false,
+  rawOutput: false,
   result: null,
   resume: null,
   ephemeral: false,

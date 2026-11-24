@@ -519,7 +519,11 @@
       {onToggle}
       tone={message.result === "warning" ? "warning" : "process"}
     >
-      <MarkdownText text={message.text} dense class="text-on-surface-variant" />
+      {#if message.rawOutput}
+        <CodeBlock code={message.text} capped />
+      {:else}
+        <MarkdownText text={message.text} dense class="text-on-surface-variant" />
+      {/if}
     </Collapsible>
   {:else if message.role === "api_error"}
     {@const warning = message.result === "warning"}

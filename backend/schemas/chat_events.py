@@ -405,6 +405,7 @@ class Hook(Event):
     matcher: Optional[str] = None
     text: str
     level: Optional[Literal["warning"]] = None
+    raw: bool = False
 
 
 class Notification(Event):

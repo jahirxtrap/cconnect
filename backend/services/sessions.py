@@ -33,6 +33,7 @@ _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
 _SHELL_INPUT_RE = re.compile(r"^<bash-input>([\s\S]*?)</bash-input>")
 _SHELL_INPUT = "<bash-input>"
 _SHELL_OUTPUT = "<bash-stdout>"
+_SHELL_TOOLS = frozenset({"Bash", "PowerShell"})
 _COMPACT_MARK = b'"compact_boundary"'
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 _REMINDER_RE = re.compile(r"<system-reminder>.*?</system-reminder>", re.DOTALL)
@@ -1287,6 +1288,7 @@ def list_checkpoints(project_key: str, session_id: str, until: Optional[str] = N
 def _points_of(entries: list[dict]) -> list[dict]:
     points: list[dict] = []
     last_anchor: Optional[str] = None
+    untracked = 0
     for entry in entries:
         etype = entry.get("type")
         if entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary"):
@@ -1296,6 +1298,8 @@ def _points_of(entries: list[dict]) -> list[dict]:
         if etype == "assistant" and uuid and isinstance(content, list):
             if any(isinstance(b, dict) and b.get("type") == "text" and (b.get("text") or "").strip() for b in content):
                 last_anchor = uuid
+            if any(isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") in _SHELL_TOOLS for b in content):
+                untracked = len(points)
             continue
         if etype != "user" or not uuid:
             continue
@@ -1320,7 +1324,9 @@ def _points_of(entries: list[dict]) -> list[dict]:
             "text": text,
             "ts": entry.get("timestamp"),
         })
-    return points
+        if text.startswith(_SHELL_INPUT):
+            untracked = len(points)
+    return [{**point, "untracked": index < untracked} for index, point in enumerate(points)]
 
 
 def _parse_ts(value) -> Optional[int]:

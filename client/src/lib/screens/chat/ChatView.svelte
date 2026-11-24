@@ -610,9 +610,18 @@
         />
       {/key}
     </div>
-    {#if notices || chat.mods.toasts.length || rewindNotice}
+    {#if notices || chat.mods.toasts.length || rewindNotice || chat.rewindShortfall}
       <FloatDock stacked>
         {@render notices?.()}
+        {#if chat.rewindShortfall}
+          {@const shortfall = chat.rewindShortfall}
+          <NoticeCard
+            text={shortfall.error
+              ? t("REWIND_PARTIAL", shortfall.error)
+              : t("REWIND_SKIPPED_LINKS", shortfall.skippedLinks)}
+            onDismiss={() => (chat.rewindShortfall = null)}
+          />
+        {/if}
         {#if rewindNotice}
           <NoticeCard
             text={t("REWIND_PENDING")}

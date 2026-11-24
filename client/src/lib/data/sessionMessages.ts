@@ -34,6 +34,7 @@ type MessageFields =
   | "toolFailed"
   | "toolBlockedBy"
   | "labelOnly"
+  | "rawOutput"
   | "result"
   | "resume"
   | "images"
@@ -183,6 +184,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     })(),
     index: number(raw, "index") ?? -1,
     labelOnly: raw.label === true || (type === "hook" && !body),
+    rawOutput: raw.raw === true,
     result: text(raw, RESULT_FIELD[type ?? ""] ?? "result"),
     resume: resumeOf(raw.resume),
     images: images.length ? images : null,

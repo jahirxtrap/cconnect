@@ -17,6 +17,12 @@ export interface Plugin {
   local: boolean;
   icon: string | null;
   needsCli: string | null;
+  requires: PluginNeed[];
+}
+
+export interface PluginNeed {
+  id: string;
+  optional: boolean;
 }
 
 export const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
@@ -93,6 +99,9 @@ export interface Hook {
   condition: string | null;
   type: string | null;
   run: string | null;
+  server: string | null;
+  tool: string | null;
+  blocksOnFailure: boolean | null;
   timeout: number | null;
   source: string;
   plugin: string | null;
@@ -131,6 +140,8 @@ export interface ActionResult {
 export interface PluginChange extends ActionResult {
   held: number;
   updates: Record<string, PluginUpdate> | null;
+  printed: string | null;
+  notes: string[];
 }
 
 export interface ActionOutcome extends ActionResult {
@@ -181,6 +192,7 @@ export interface PluginFinished {
 }
 
 const UPDATE_STATUSES: PluginUpdateStatus[] = ["queued", "updating", "failed"];
+const HOOK_CONTINUES = "continue";
 
 export const parsePluginUpdates = (raw: unknown): Record<string, PluginUpdate> =>
   Object.fromEntries(
@@ -209,6 +221,8 @@ const toPluginChange = (data: Wire | null): PluginChange => ({
   ...toAction(data),
   held: heldOf(data),
   updates: data?.updates ? parsePluginUpdates(data.updates) : null,
+  printed: data?.printed || null,
+  notes: Array.isArray(data?.notes) ? data.notes.filter((note: unknown) => typeof note === "string") : [],
 });
 
 export const createClaudeApi = (client: HttpClient, profile: () => Profile) => ({
@@ -287,6 +301,9 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           local: item.local === true,
           icon: item.icon ?? null,
           needsCli: item.needs_cli ?? null,
+          requires: (item.requires ?? [])
+            .filter((need: Wire) => typeof need.id === "string")
+            .map((need: Wire) => ({ id: need.id, optional: need.optional === true })),
         })),
       marketplaces: (data.marketplaces ?? [])
         .filter((item: Wire) => item.name)
@@ -416,7 +433,10 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         matcher: item.matcher ?? null,
         condition: item.if ?? null,
         type: item.type ?? null,
-        run: item.command ?? item.prompt ?? item.url ?? null,
+        run: item.command ?? item.prompt ?? item.url ?? (item.input ? JSON.stringify(item.input, null, 2) : null),
+        server: item.server ?? null,
+        tool: item.tool ?? null,
+        blocksOnFailure: item.on_failure == null ? null : item.on_failure !== HOOK_CONTINUES,
         timeout: typeof item.timeout === "number" ? item.timeout : null,
         source: item.source || MCP_USER_SOURCE,
         plugin: item.plugin ?? null,

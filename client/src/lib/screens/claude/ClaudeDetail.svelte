@@ -111,6 +111,7 @@
     type Memories,
     type Plugin,
     type PluginChange,
+    type PluginNeed,
     type PluginReview,
     type ServiceStatus,
     type Skill,
@@ -174,6 +175,7 @@
 
   const SKILL_FILE = "SKILL.md";
   const HOOK_COMMAND = "command";
+  const HOOK_MCP_TOOL = "mcp_tool";
   const TRANSPORTS = ["stdio", "http", "sse"];
   const CARD_REM = 18;
   const PANEL_REM = 22.5;
@@ -192,6 +194,7 @@
   let busy = $state(false);
   let dialogBusy = $state<string | null>(null);
   let actionError = $state<string | null>(null);
+  let installOutput = $state<{ printed: string | null; notes: string[] } | null>(null);
   let reloadHeld = $state(false);
 
   let memoriesProject = $state<string | null>(null);
@@ -364,8 +367,13 @@
     busy = true;
     const result = await action();
     if (run !== actionRun) return;
-    if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
-    else if ("held" in result && result.held) reloadHeld = true;
+    const printed = "printed" in result ? result.printed : null;
+    if (!result.ok) actionError = [result.message, printed].filter(Boolean).join("\n\n") || t("CONNECTION_ERROR");
+    else {
+      if ("held" in result && result.held) reloadHeld = true;
+      const notes = "notes" in result ? result.notes : [];
+      installOutput = printed || notes.length ? { printed, notes } : null;
+    }
     await reload();
     dialogBusy = null;
     busy = false;
@@ -457,6 +465,13 @@
     ];
     return entries.filter((item) => item.filter.kind === "all" || item.count > 0);
   });
+
+  const needLabel = (need: PluginNeed) => (need.optional ? t("PLUGIN_OPTIONAL_NEED", need.id) : need.id);
+
+  const requiredBy = (plugin: Plugin) =>
+    (extensions?.plugins ?? [])
+      .filter((other) => other.requires.some((need) => need.id === pluginKey(plugin)))
+      .map(pluginKey);
 
   const sameFilter = (a: PluginFilter, b: PluginFilter) =>
     a.kind === b.kind && (a.kind !== "market" || (b.kind === "market" && a.name === b.name));
@@ -1168,6 +1183,8 @@
     {@const rows = [
       { label: t("MARKETPLACE"), text: plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace },
       { label: t("VERSION"), text: plugin.version ?? "" },
+      { label: t("PLUGIN_REQUIRES"), text: plugin.requires.map(needLabel).join(SEPARATOR) },
+      { label: t("PLUGIN_REQUIRED_BY"), text: requiredBy(plugin).join(SEPARATOR) },
       { label: t("COMMANDS"), text: pluginReview && plugin.mod ? modCommands(pluginReview).join(SEPARATOR) : "" },
       { label: t("MOD_CALLS"), text: pluginReview && plugin.mod ? joined(...modAreas(pluginReview)) : "" },
     ].filter((fact) => fact.text)}
@@ -1486,7 +1503,7 @@
   {@const market = confirmMarketRemove}
   <ConfirmDialog
     title={t("DELETE")}
-    text={t("DELETE_FILE_CONFIRM", market.name)}
+    text={t("MARKETPLACE_REMOVE_CONFIRM", market.name)}
     confirmLabel={t("DELETE")}
     danger
     onConfirm={() => {
@@ -1519,11 +1536,17 @@
       { label: t("HOOK_MATCHER"), text: hook.matcher },
       { label: t("HOOK_CONDITION"), text: hook.condition },
       { label: t("HOOK_TYPE"), text: hook.type },
+      { label: t("MCP_SERVER"), text: hook.server },
+      { label: t("HOOK_TOOL"), text: hook.tool },
+      {
+        label: t("HOOK_ON_FAILURE"),
+        text: hook.blocksOnFailure === null ? null : t(hook.blocksOnFailure ? "HOOK_FAILURE_BLOCKS" : "HOOK_FAILURE_CONTINUES"),
+      },
       { label: t("HOOK_TIMEOUT"), text: hook.timeout === null ? null : formatSeconds(hook.timeout) },
     ].filter((fact) => fact.text)}
   />
   {#if hook.run}
-    <CodeBlock code={hook.run} lang={hook.type === HOOK_COMMAND ? "bash" : null} />
+    <CodeBlock code={hook.run} lang={hook.type === HOOK_COMMAND ? "bash" : hook.type === HOOK_MCP_TOOL ? "json" : null} />
   {/if}
 {/snippet}
 
@@ -1735,10 +1758,27 @@
 
 {#if actionError}
   {@const message = actionError}
-  <CompactDialog title={t("CONNECTION_ERROR")} onDismiss={() => (actionError = null)}>
+  <CompactDialog title={t("ACTION_FAILED")} onDismiss={() => (actionError = null)}>
     {#snippet buttons()}
       <Button onclick={() => (actionError = null)}>{t("ACCEPT")}</Button>
     {/snippet}
-    <p class="text-body-sm text-on-surface-variant">{message}</p>
+    <p class="text-body-sm whitespace-pre-line text-on-surface-variant">{message}</p>
+  </CompactDialog>
+{/if}
+
+{#if installOutput}
+  {@const output = installOutput}
+  <CompactDialog title={t("PLUGIN_INSTALL_OUTPUT")} onDismiss={() => (installOutput = null)}>
+    {#snippet buttons()}
+      <Button onclick={() => (installOutput = null)}>{t("ACCEPT")}</Button>
+    {/snippet}
+    <div class="flex flex-col gap-3.5">
+      {#each output.notes as note (note)}
+        <p class="text-body-sm text-on-surface-variant">{note}</p>
+      {/each}
+      {#if output.printed}
+        <CodeBlock code={output.printed} capped />
+      {/if}
+    </div>
   </CompactDialog>
 {/if}

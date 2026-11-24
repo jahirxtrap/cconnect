@@ -79,10 +79,15 @@
           {#if preview === null}
             <StatusDot loading />
             {t("LOADING")}
+          {:else if preview.canRewind && target.untracked && !preview.filesChanged.length}
+            {t("REWIND_UNTRACKED")}
           {:else if preview.canRewind}
             <span class="text-green">+{preview.insertions}</span>
             <span class="text-red">−{preview.deletions}</span>
             <span>• {t("REWIND_FILES_COUNT", preview.filesChanged.length)}</span>
+            {#if target.untracked}
+              <span>• {t("REWIND_UNTRACKED_MORE")}</span>
+            {/if}
           {:else}
             {preview.error ?? t("REWIND_NO_CHECKPOINT")}
           {/if}

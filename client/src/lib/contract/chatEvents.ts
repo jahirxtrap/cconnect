@@ -584,6 +584,7 @@ export interface Hook {
   matcher?: string | null;
   text: string;
   level?: "warning" | null;
+  raw?: boolean;
 }
 export interface Notification {
   seq?: number | null;

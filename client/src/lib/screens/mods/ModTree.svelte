@@ -20,6 +20,7 @@
     blockStyle,
     borderOf,
     boxStyle,
+    clampStyle,
     middleCut,
     monoRun,
     monoText,
@@ -72,6 +73,7 @@
     end: "overflow-hidden text-ellipsis whitespace-pre",
     start: "overflow-hidden text-ellipsis whitespace-pre [direction:rtl] text-left",
     middle: "overflow-hidden whitespace-pre",
+    clip: "overflow-hidden whitespace-pre",
   };
   const ART_WRAP = "whitespace-pre";
 
@@ -311,7 +313,7 @@
       ></span>
     {:else}
       <span
-        style={textStyle(props)}
+        style={[textStyle(props), wrap === "wrap" ? clampStyle(props) : ""].filter(Boolean).join("; ")}
         class="min-w-0 {wrapClass(wrap, mono)} {look}"
         {...pointer(child, null)}>{@render children(child, inner)}</span
       >
