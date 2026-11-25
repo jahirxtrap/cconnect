@@ -20,6 +20,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { framePainter, type FramePainter } from "$lib/ui/framePainter";
+  import { keepStill, takeStill } from "$lib/ui/frameStills";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
@@ -48,6 +49,7 @@
   let typer = $state<HTMLInputElement | null>(null);
   let painter: FramePainter | null = null;
   let link: DeviceScreenLink | null = null;
+  let keep: (() => void) | null = null;
   let ready = $state(false);
   let connected = $state(false);
   let dropped = $state(false);
@@ -74,6 +76,7 @@
     );
     painter = created;
     return () => {
+      keep?.();
       created.close();
       painter = null;
     };
@@ -84,6 +87,8 @@
     const profile = backend.active;
     const key = securityKeys.keyFor(profile);
     if (!surface) return;
+    const still = `device|${profile?.id ?? ""}|${target}`;
+    let live = true;
     ready = false;
     failed = null;
     const created = deviceScreenLink(
@@ -109,9 +114,24 @@
       viewport,
     );
     link = created;
+    void takeStill(still).then((frame) => {
+      if (frame && live && !ready) painter?.frame(frame);
+    });
+    keep = () => {
+      keep = null;
+      if (ready && painter) keepStill(still, painter);
+    };
     return () => {
+      keep?.();
+      live = false;
       created.close();
       link = null;
+      ready = false;
+      connected = false;
+      dropped = false;
+      screen = null;
+      displayOff = false;
+      painter?.rearm();
     };
   });
 

@@ -1,18 +1,13 @@
 import type { BrowserState } from "$lib/services/browserSocket";
 
-export interface BrowserPosition {
-  page: BrowserState;
-  frame: ArrayBuffer | null;
-}
+const pages = new Map<string, BrowserState>();
 
-const positions = new Map<string, BrowserPosition>();
-
-export const takeBrowser = (environment: string): BrowserPosition | undefined => {
-  const saved = positions.get(environment);
-  positions.delete(environment);
+export const takeBrowser = (environment: string): BrowserState | undefined => {
+  const saved = pages.get(environment);
+  pages.delete(environment);
   return saved;
 };
 
-export const rememberBrowser = (environment: string, position: BrowserPosition) => {
-  positions.set(environment, position);
+export const rememberBrowser = (environment: string, page: BrowserState) => {
+  pages.set(environment, page);
 };

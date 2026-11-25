@@ -24,7 +24,7 @@
   import { boundsOf, BrowserLayer, coverOf } from "./browserLayer";
   import { rememberBrowser, takeBrowser } from "./browserMemory";
   import { framePainter, type FramePainter } from "$lib/ui/framePainter";
-  import { JPEG_KIND } from "$lib/ui/frameSurface";
+  import { keepStill, takeStill } from "$lib/ui/frameStills";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,
@@ -139,7 +139,7 @@
 
   let shownOnScreen = $state(true);
   let painter: FramePainter | null = null;
-  let lastFrame: ArrayBuffer | null = null;
+  let keep: (() => void) | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
   let typed = "";
   let touchedAt = -Infinity;
@@ -338,11 +338,6 @@
     scale: Math.min(MAX_SCALE, Math.max(1, window.devicePixelRatio || 1)),
   });
 
-  const paint = (buffer: ArrayBuffer) => {
-    if (new Uint8Array(buffer, 0, 1)[0] === JPEG_KIND) lastFrame = buffer;
-    painter?.frame(buffer);
-  };
-
   const unready = () => {
     ready = false;
     painter?.rearm();
@@ -357,6 +352,7 @@
     );
     painter = created;
     return () => {
+      keep?.();
       created.close();
       painter = null;
     };
@@ -372,15 +368,15 @@
   $effect(() => {
     const environment = backend.activeId ?? "";
     if (!surface) return;
+    const still = `browser|${environment}`;
+    let live = true;
     untrack(() => {
       const saved = takeBrowser(environment);
-      if (!saved) return;
-      page = saved.page;
-      if (saved.frame) paint(saved.frame);
+      if (saved) page = saved;
     });
     const created = browserLink(
       {
-        onFrame: paint,
+        onFrame: (buffer) => painter?.frame(buffer),
         onStream: (info) => painter?.stream(info),
         onState: receive,
         onConnected: (value) => {
@@ -403,10 +399,18 @@
       viewport,
     );
     link = created;
+    void takeStill(still).then((frame) => {
+      if (frame && live && !ready) painter?.frame(frame);
+    });
+    keep = () => {
+      keep = null;
+      if (ready && page.activeTab && painter) keepStill(still, painter);
+    };
     return () => {
+      keep?.();
+      live = false;
       created.close();
-      rememberBrowser(environment, { page, frame: lastFrame });
-      lastFrame = null;
+      rememberBrowser(environment, page);
       link = null;
       unready();
       connected = false;
@@ -547,7 +551,6 @@
   $effect(() => {
     if (page.activeTab || !canvas) return;
     painter?.clear();
-    lastFrame = null;
   });
 
   $effect(() => {

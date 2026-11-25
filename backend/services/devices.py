@@ -275,8 +275,11 @@ async def pair(address: str, code: str) -> str:
 
 
 async def connect(address: str) -> str:
+    target = _address(address)
     try:
-        answer = await adb.connect(_address(address))
+        if hub.holds_stale(target):
+            await adb.disconnect(target)
+        answer = await adb.connect(target)
     except adb.AdbError as exc:
         raise DeviceError(CONNECT_FAILED, exc.detail) from exc
     if not answer.startswith(_CONNECTED_REPLIES):
@@ -317,6 +320,7 @@ class DevicesHub:
     def __init__(self):
         self._subscribers: set[asyncio.Queue] = set()
         self._rows: dict[str, dict] = {}
+        self._dropped: set[str] = set()
         self._info: dict[str, dict[str, str]] = {}
         self._describing: dict[str, asyncio.Task] = {}
         self._naming: dict[str, asyncio.Task] = {}
@@ -417,6 +421,9 @@ class DevicesHub:
             raise DeviceError(MISSING, serial)
         return self._device(found, self._labels(self._emulators()))
 
+    def holds_stale(self, serial: str) -> bool:
+        return serial in self._rows and self._rows[serial]["state"] != READY
+
     def ready_device(self, serial: str) -> dict:
         found = self.device(serial)
         if found["state"] != READY:
@@ -441,6 +448,11 @@ class DevicesHub:
             self._named.discard(serial)
         for serial in [serial for serial in self._naming if serial not in rows]:
             self._naming.pop(serial).cancel()
+        self._dropped = {
+            serial
+            for serial, row in rows.items()
+            if row["kind"] == WIFI and row["state"] != READY and (serial in self._dropped or self._rows.get(serial, {}).get("state") == READY)
+        }
         self._rows = rows
         self._listed.set()
         self._auto_connect()
@@ -462,7 +474,7 @@ class DevicesHub:
         running = {self._avd_of(serial): serial for serial in self._rows if kind_of(serial) == EMULATOR}
         emulators = self._emulators()
         labels = self._labels(emulators)
-        devices = [self._device(row, labels) for row in self._rows.values()]
+        devices = [self._device(row, labels) for row in self._rows.values() if row["serial"] not in self._dropped]
         listed = {device["saved"] for device in devices if device["saved"]}
         return {
             "type": "state",

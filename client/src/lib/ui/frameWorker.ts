@@ -6,7 +6,7 @@ type Inbound =
   | { op: "stream"; info: StreamInfo }
   | { op: "clear" }
   | { op: "rearm" }
-  | { op: "capture"; id: number };
+  | { op: "capture"; id: number; type: string };
 
 const scope = self as unknown as {
   postMessage: (message: unknown) => void;
@@ -16,8 +16,8 @@ const scope = self as unknown as {
 let canvas: OffscreenCanvas | null = null;
 let painter: ReturnType<typeof surfacePainter> | null = null;
 
-const capture = async (id: number) => {
-  const blob = canvas ? await canvas.convertToBlob({ type: "image/png" }).catch(() => null) : null;
+const capture = async (id: number, type: string) => {
+  const blob = canvas ? await canvas.convertToBlob({ type }).catch(() => null) : null;
   scope.postMessage({ op: "captured", id, blob });
 };
 
@@ -34,5 +34,5 @@ scope.onmessage = (event) => {
   else if (message.op === "stream") painter?.stream(message.info);
   else if (message.op === "clear") painter?.clear();
   else if (message.op === "rearm") painter?.rearm();
-  else void capture(message.id);
+  else void capture(message.id, message.type);
 };

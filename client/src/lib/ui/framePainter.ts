@@ -5,9 +5,11 @@ export interface FramePainter {
   stream: (info: StreamInfo) => void;
   clear: () => void;
   rearm: () => void;
-  capture: () => Promise<Blob | null>;
+  capture: (type?: string) => Promise<Blob | null>;
   close: () => void;
 }
+
+const SCREENSHOT_TYPE = "image/png";
 
 type Outbound = { op: "painted" } | { op: "keyframe" } | { op: "captured"; id: number; blob: Blob | null };
 
@@ -23,6 +25,10 @@ const workerPainter = (canvas: HTMLCanvasElement, onPainted: () => void, onKeyNe
   worker.postMessage({ op: "init", canvas: offscreen }, [offscreen]);
   const captures = new Map<number, (blob: Blob | null) => void>();
   let asked = 0;
+  let closing = false;
+  const finish = () => {
+    if (closing && !captures.size) worker.terminate();
+  };
   worker.onmessage = (event: MessageEvent<Outbound>) => {
     const message = event.data;
     if (message.op === "painted") {
@@ -35,29 +41,31 @@ const workerPainter = (canvas: HTMLCanvasElement, onPainted: () => void, onKeyNe
     }
     captures.get(message.id)?.(message.blob);
     captures.delete(message.id);
+    finish();
   };
   return {
     frame: (buffer) => worker.postMessage({ op: "frame", buffer }),
     stream: (info) => worker.postMessage({ op: "stream", info }),
     clear: () => worker.postMessage({ op: "clear" }),
     rearm: () => worker.postMessage({ op: "rearm" }),
-    capture: () =>
-      new Promise((done) => {
-        const id = ++asked;
-        captures.set(id, done);
-        worker.postMessage({ op: "capture", id });
-      }),
+    capture: (type = SCREENSHOT_TYPE) =>
+      closing
+        ? Promise.resolve(null)
+        : new Promise((done) => {
+            const id = ++asked;
+            captures.set(id, done);
+            worker.postMessage({ op: "capture", id, type });
+          }),
     close: () => {
-      for (const done of captures.values()) done(null);
-      captures.clear();
-      worker.terminate();
+      closing = true;
+      finish();
     },
   };
 };
 
 const mainPainter = (canvas: HTMLCanvasElement, onPainted: () => void, onKeyNeeded: () => void): FramePainter => ({
   ...surfacePainter(canvas, onPainted, onKeyNeeded),
-  capture: () => new Promise((done) => canvas.toBlob(done, "image/png")),
+  capture: (type = SCREENSHOT_TYPE) => new Promise((done) => canvas.toBlob(done, type)),
 });
 
 export const framePainter = (canvas: HTMLCanvasElement, onPainted: () => void, onKeyNeeded: () => void): FramePainter => {
