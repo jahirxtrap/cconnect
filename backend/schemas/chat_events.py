@@ -95,7 +95,7 @@ class TodoItem(Shape):
 class LimitWindow(Shape):
     id: str
     percent: float
-    resets_at: Unknown = None
+    resets_at: Optional[int] = None
     severity: Optional[str] = None
 
 

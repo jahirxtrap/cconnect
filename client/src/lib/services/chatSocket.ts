@@ -1064,6 +1064,7 @@ export class ChatSocket {
           windows: (event.windows ?? []).map((window) => ({
             id: window.id ?? "",
             percent: window.percent ?? 0,
+            resetsAt: window.resets_at ?? null,
             severity: window.severity ?? null,
           })),
         };

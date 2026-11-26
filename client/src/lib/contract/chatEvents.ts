@@ -842,7 +842,7 @@ export interface RateLimit {
 export interface LimitWindow {
   id: string;
   percent: number;
-  resets_at?: unknown;
+  resets_at?: number | null;
   severity?: string | null;
 }
 export interface Cache {

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import suppress
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
 import psutil
 from loguru import logger
@@ -16,6 +16,10 @@ OWN_TURN_TIMEOUT = 300.0
 _MEGABYTE = 1024 * 1024
 TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
 UNATTENDED = "Nobody can answer this now: no turn is running in this chat, so there is no one to ask."
+
+
+async def _synthetic(text: str) -> AsyncIterator[dict]:
+    yield {"type": "user", "message": {"role": "user", "content": text}, "parent_tool_use_id": None, "isSynthetic": True}
 
 
 class TurnBinding:
@@ -103,7 +107,7 @@ class PersistentSession:
         if self.client is None:
             return False
         try:
-            await self.client.query(text)
+            await self.client.query(_synthetic(text))
         except Exception as exc:
             logger.warning(f"message to the CLI dropped: {type(exc).__name__}: {exc}")
             return False

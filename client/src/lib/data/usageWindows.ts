@@ -14,6 +14,7 @@ export const usageWindowLabel = (id: string): string => (id in WINDOW_LABELS ? t
 export interface LimitWindow {
   id: string;
   percent: number;
+  resetsAt: number | null;
   severity: string | null;
 }
 

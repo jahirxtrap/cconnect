@@ -1554,8 +1554,13 @@ def _scheduled_message(entry: dict) -> dict | None:
     return {"type": "scheduled_message", "text": text} if text else None
 
 
+def _relayed_notification(entry: dict) -> dict | None:
+    match = _NOTIFICATION_BLOCK_RE.search(_text_from_content((entry.get("message") or {}).get("content")))
+    return _notification_item(match.group(0)) if match else None
+
+
 def _carried_meta(entry: dict) -> dict | None:
-    return _peer_message(entry) or _scheduled_message(entry)
+    return _peer_message(entry) or _scheduled_message(entry) or _relayed_notification(entry)
 
 
 def _plugin_message_item(text: str) -> dict | None:

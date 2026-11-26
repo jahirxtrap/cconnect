@@ -39,8 +39,9 @@ def remember_windows(account: str, windows: list[dict]) -> None:
     _live_windows[account] = windows
 
 
-def live_windows(account: str) -> list[dict] | None:
-    return _live_windows.get(account)
+def live_windows(account: str) -> list[dict]:
+    now = time.time()
+    return [window for window in _live_windows.get(account, []) if not window.get("resets_at") or window["resets_at"] > now]
 
 
 def _oauth(field: str, account: str | None = None) -> object:

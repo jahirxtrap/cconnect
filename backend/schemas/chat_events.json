@@ -3322,8 +3322,15 @@
           "type": "number"
         },
         "resets_at": {
-          "default": null,
-          "tsType": "unknown"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "severity": {
           "anyOf": [
