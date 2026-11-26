@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field
 from core.responses import api_response, derived_response, fixed_response
 from schemas.accounts import ProviderAuth
 from services import accounts, asset_icons, claude_assets, claude_manage, cli_login, plugin_secrets, plugin_updates
-from services import claude_status
+from core.config import DEFAULT_CWD
+from services import claude_status, mcp_skills
 from services import usage as usage_service
 
 router = APIRouter(tags=["Claude"])
@@ -240,8 +241,17 @@ def marketplace_catalog(name: str):
 
 
 @router.get("/claude/skills")
-def get_skills():
-    return api_response(data=claude_assets.list_skills())
+async def get_skills(cwd: str | None = None, refresh: bool = False):
+    own, served = await asyncio.gather(asyncio.to_thread(claude_assets.list_skills), mcp_skills.listed(cwd or DEFAULT_CWD, refresh))
+    return api_response(data=sorted([*own, *served], key=lambda skill: (not skill["enabled"], skill["name"])))
+
+
+@router.get("/claude/skills/mcp-file")
+async def get_mcp_skill_file(server: str, uri: str, cwd: str | None = None):
+    text = await mcp_skills.read(server, uri, cwd or DEFAULT_CWD)
+    if text is None:
+        raise HTTPException(status_code=404, detail="skill file not found")
+    return Response(content=text, media_type="text/markdown; charset=utf-8")
 
 
 @router.get("/claude/skills/files")

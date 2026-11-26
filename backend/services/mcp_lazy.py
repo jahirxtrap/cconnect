@@ -12,11 +12,11 @@ import re
 import secrets
 import time
 import uuid
-from contextlib import suppress
+from contextlib import asynccontextmanager, suppress
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 import anyio
 import anyio.abc
@@ -24,6 +24,7 @@ import mcp.types as types
 import psutil
 from loguru import logger
 from mcp import ClientSession, StdioServerParameters, stdio_client
+from mcp.client.client import Client
 from mcp.client.session import ClientRequestContext
 from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel.server import Server
@@ -58,6 +59,10 @@ _FORWARDED = {
     "completion/complete": types.CompleteRequestParams,
 }
 _LOG_LEVEL = "logging/setLevel"
+_SKILLS_EXTENSION = "io.modelcontextprotocol/skills"
+_SKILLS = "skills"
+_SKILLS_LIST = "skills/list"
+_PROBE_TIMEOUT = 10.0
 _VERSION_HEADER = b"mcp-protocol-version"
 _UNSUPPORTED_VERSION = json.dumps({
     "jsonrpc": "2.0",
@@ -230,6 +235,22 @@ def _wire(model: Any) -> dict[str, Any]:
     return model.model_dump(by_alias=True, mode="json", exclude_none=True)
 
 
+def offers_skills(catalog: dict[str, Any]) -> bool:
+    return catalog.get(_SKILLS) is not None
+
+
+async def _pages(session: ClientSession, key: str, method: str) -> list[Any]:
+    items: list[Any] = []
+    cursor = None
+    while True:
+        params = {"cursor": cursor} if cursor else None
+        page = await session.send_request(types.Request[dict[str, Any] | None, str](method=method, params=params), _RAW)
+        items.extend(page.get(key) or [])
+        cursor = page.get("nextCursor")
+        if not cursor:
+            return items
+
+
 async def _read_lists(session: ClientSession, capabilities: types.ServerCapabilities) -> dict[str, Any]:
     offered = {
         "tools": capabilities.tools is not None,
@@ -239,22 +260,67 @@ async def _read_lists(session: ClientSession, capabilities: types.ServerCapabili
     }
     lists: dict[str, Any] = {}
     for key, method in _LISTS.items():
-        items: list[Any] = []
-        cursor = None
-        while offered[key]:
-            params = {"cursor": cursor} if cursor else None
-            try:
-                page = await session.send_request(types.Request[dict[str, Any] | None, str](method=method, params=params), _RAW)
-            except MCPError as exc:
-                if exc.error.code != types.METHOD_NOT_FOUND:
-                    raise
-                break
-            items.extend(page.get(key) or [])
-            cursor = page.get("nextCursor")
-            if not cursor:
-                break
-        lists[key] = items
+        try:
+            lists[key] = await _pages(session, key, method) if offered[key] else []
+        except MCPError as exc:
+            if exc.error.code != types.METHOD_NOT_FOUND:
+                raise
+            lists[key] = []
     return lists
+
+
+@asynccontextmanager
+async def _modern(spec: Spec, env: dict[str, str], cwd: str) -> AsyncIterator[Client]:
+    params = StdioServerParameters(command=spec.command, args=list(spec.args), env=env, cwd=cwd, encoding_error_handler="replace")
+    with open(os.devnull, "w", encoding="utf-8") as errlog:
+        async with Client(stdio_client(params, errlog=errlog), mode="auto", read_timeout_seconds=_PROBE_TIMEOUT) as client:
+            yield client
+
+
+async def skills_listed(client: Client) -> Optional[list[Any]]:
+    """The skills a server lists: [] when it declares the extension and lists none, None without it."""
+    if _SKILLS_EXTENSION not in (client.server_capabilities.extensions or {}):
+        return None
+    with suppress(MCPError):
+        return await _pages(client.session, _SKILLS, _SKILLS_LIST)
+    return []
+
+
+async def _skills_of(spec: Spec, env: dict[str, str], cwd: str) -> Optional[list[Any]]:
+    try:
+        async with _modern(spec, env, cwd) as client:
+            return await skills_listed(client)
+    except Exception:
+        return None
+
+
+def _local(cwd: str) -> tuple[list[Spec], dict[str, str]]:
+    base = {**os.environ, **_SDK_ENV}
+    specs = _specs(cwd, base)
+    _load_catalogs([spec.key for spec in specs])
+    return specs, base
+
+
+async def local_skills(cwd: str) -> dict[str, list[Any]]:
+    """Each local server's skills from its catalog; a server without one is read in the background."""
+    specs, base = await asyncio.to_thread(_local, cwd)
+    found = {}
+    for spec in specs:
+        catalog = _catalogs.get(spec.key)
+        if catalog is None or _SKILLS not in catalog:
+            _build_later(spec, base, cwd)
+        elif catalog[_SKILLS]:
+            found[spec.name] = catalog[_SKILLS]
+    return found
+
+
+async def read_local(name: str, uri: str, cwd: str) -> Optional[types.ReadResourceResult]:
+    specs, base = await asyncio.to_thread(_local, cwd)
+    spec = next((spec for spec in specs if spec.name == name), None)
+    if spec is None:
+        return None
+    async with _modern(spec, _spawn_env(base, spec, cwd, None), cwd) as client:
+        return await client.read_resource(uri)
 
 
 class _Upstream:
@@ -381,8 +447,8 @@ class _Link:
         if initialized is None or upstream.session is None:
             return
         lists = await _read_lists(upstream.session, initialized.capabilities)
-        fresh = {"initialize": _wire(initialized), **lists}
         current = self.served.catalog
+        fresh = {"initialize": _wire(initialized), **lists, **({_SKILLS: current[_SKILLS]} if _SKILLS in current else {})}
         if fresh == current:
             return
         await asyncio.to_thread(_store, self.served.spec, fresh)
@@ -604,16 +670,21 @@ class LazyServers:
 async def _build(spec: Spec, base: dict[str, str], cwd: str) -> None:
     try:
         async with _BUILDS:
-            upstream = _Upstream(spec, _spawn_env(base, spec, cwd, None), cwd)
+            env = _spawn_env(base, spec, cwd, None)
+            upstream = _Upstream(spec, env, cwd)
+            catalog: Optional[dict[str, Any]] = None
             async with anyio.create_task_group() as group:
                 group.start_soon(upstream.run)
                 await upstream.ready.wait()
                 try:
                     if upstream.session is not None and upstream.initialized is not None:
                         lists = await _read_lists(upstream.session, upstream.initialized.capabilities)
-                        await asyncio.to_thread(_store, spec, {"initialize": _wire(upstream.initialized), **lists})
+                        catalog = {"initialize": _wire(upstream.initialized), **lists}
                 finally:
                     await upstream.close()
+            if catalog is not None:
+                catalog[_SKILLS] = await _skills_of(spec, env, cwd)
+                await asyncio.to_thread(_store, spec, catalog)
     except Exception as exc:
         logger.debug(f"MCP catalog of {spec.name} unavailable: {type(exc).__name__}: {exc}")
     finally:
@@ -628,7 +699,7 @@ def _build_later(spec: Spec, base: dict[str, str], cwd: str) -> None:
 
 
 async def open_for(options: Any, session_id: Callable[[], Optional[str]]) -> Optional[LazyServers]:
-    """Serve the chat's local servers through the backend, those it has a catalog of; the rest start as before and get one."""
+    """Serve local servers with a catalog and no skills through the backend; the CLI starts the rest."""
     if "user" not in (options.setting_sources or []):
         return None
     cwd = str(options.cwd or "")
@@ -637,12 +708,13 @@ async def open_for(options: Any, session_id: Callable[[], Optional[str]]) -> Opt
     await asyncio.to_thread(_load_catalogs, [spec.key for spec in specs])
     served = []
     for spec in specs:
-        if spec.key in _catalogs:
+        catalog = _catalogs.get(spec.key)
+        if catalog is None or _SKILLS not in catalog:
+            _build_later(spec, base, cwd)
+        if catalog is not None and not offers_skills(catalog):
             item = _Served(spec, base, cwd, session_id)
             await item.start()
             served.append(item)
-        else:
-            _build_later(spec, base, cwd)
     return LazyServers(served) if served else None
 
 

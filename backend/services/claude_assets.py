@@ -54,7 +54,7 @@ _SIGN_IN_TIMEOUT = 5.0
 _SIGN_IN_PING = {"jsonrpc": "2.0", "id": 0, "method": "ping"}
 _SIGN_IN_ACCEPT = {"http": "application/json, text/event-stream", "sse": "text/event-stream"}
 _UNAUTHORIZED = 401
-_PLACEHOLDER_MARK = "${"
+PLACEHOLDER_MARK = "${"
 _MCP_TOOL_CHARS = re.compile(r"[^A-Za-z0-9_-]")
 _CLAUDEAI_CONNECTED = "claudeAiMcpEverConnected"
 _CLAUDEAI_PREFIX = "claude.ai "
@@ -666,16 +666,16 @@ class _McpLogins:
     tokens: dict[str, dict[str, str]]
 
 
-def _mcp_kind(cfg: dict) -> str:
+def mcp_kind(cfg: dict) -> str:
     return cfg.get("type") or ("http" if cfg.get("url") else "stdio")
 
 
 def _sign_in_key(cfg: dict) -> str:
-    return json.dumps([_mcp_kind(cfg), cfg.get("url"), cfg.get("headers") or {}], sort_keys=True)
+    return json.dumps([mcp_kind(cfg), cfg.get("url"), cfg.get("headers") or {}], sort_keys=True)
 
 
 def _asks_sign_in(cfg: dict) -> bool:
-    kind = _mcp_kind(cfg)
+    kind = mcp_kind(cfg)
     headers = {**{str(key): str(value) for key, value in (cfg.get("headers") or {}).items()}, "Accept": _SIGN_IN_ACCEPT[kind]}
     try:
         with httpx.Client(timeout=_SIGN_IN_TIMEOUT) as client, client.stream(
@@ -690,7 +690,7 @@ def _signs_in(configs: dict[str, dict]) -> set[str]:
     remote = {
         name: cfg
         for name, cfg in configs.items()
-        if _mcp_kind(cfg) in _MCP_OAUTH_TYPES and isinstance(cfg.get("url"), str) and _PLACEHOLDER_MARK not in _sign_in_key(cfg)
+        if mcp_kind(cfg) in _MCP_OAUTH_TYPES and isinstance(cfg.get("url"), str) and PLACEHOLDER_MARK not in _sign_in_key(cfg)
     }
     unknown = {_sign_in_key(cfg): cfg for cfg in remote.values() if _sign_in_key(cfg) not in _sign_in_answers}
     if unknown:
@@ -702,7 +702,7 @@ def _signs_in(configs: dict[str, dict]) -> set[str]:
 def _mcp_entry(
     name: str, label: str, cfg: dict, enabled: bool, source: str, logins: _McpLogins, icon: Path | str | None
 ) -> dict:
-    kind = _mcp_kind(cfg)
+    kind = mcp_kind(cfg)
     detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
     return {
         "name": name,

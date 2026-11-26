@@ -79,6 +79,9 @@ export interface Skill {
   plugin: string | null;
   pluginName: string | null;
   enabled: boolean;
+  server: string | null;
+  root: string | null;
+  files: string[] | null;
 }
 
 export interface McpServer {
@@ -359,8 +362,8 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return toPluginChange(await client.post<Wire>("/claude/plugins/local", { path }));
   },
 
-  async skills(): Promise<Skill[] | null> {
-    const data = await client.get<Wire[]>("/claude/skills");
+  async skills(cwd: string | null = null, refresh = false): Promise<Skill[] | null> {
+    const data = await client.get<Wire[]>("/claude/skills", { ...(cwd ? { cwd } : {}), ...(refresh ? { refresh: "true" } : {}) });
     if (!Array.isArray(data)) return null;
     return data
       .filter((item) => item.name && item.id)
@@ -371,7 +374,15 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         plugin: item.plugin ?? null,
         pluginName: item.plugin_name ?? null,
         enabled: item.enabled !== false,
+        server: item.server ?? null,
+        root: item.root ?? null,
+        files: Array.isArray(item.files) ? item.files : null,
       }));
+  },
+
+  mcpSkillFileUrl(server: string, uri: string, cwd: string | null = null): string {
+    const query = new URLSearchParams({ server, uri, ...(cwd ? { cwd } : {}) });
+    return `${baseUrlOf(profile())}/claude/skills/mcp-file?${query}`;
   },
 
   async skillFiles(plugin: string | null, skillId: string): Promise<string[]> {

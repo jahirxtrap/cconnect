@@ -246,7 +246,7 @@
 
   const filterable = $derived(loaded && FILTER_KINDS.includes(kind));
 
-  const skillKey = (skill: Skill) => `${skill.plugin}/${skill.id}`;
+  const skillKey = (skill: Skill) => `${skill.server ?? skill.plugin}/${skill.id}`;
 
   const panelTitle = $derived(
     kind === "plugins"
@@ -283,7 +283,7 @@
       extensions = await claudeApi.extensions();
       if (extensions && backend.active) pluginUpdates.adopt(backend.active, extensions.updates);
     }
-    else if (kind === "skills") skills = await claudeApi.skills();
+    else if (kind === "skills") skills = await claudeApi.skills(chat.workingPath, refreshing);
     else if (kind === "mcp") {
       accountsStore.ensure();
       mcpServers = await claudeApi.mcp(chat.workingPath);
@@ -731,7 +731,10 @@
   };
 
   const openSkillFile = (skill: Skill, file: string, name: string) => {
-    openFilePreview({ url: claudeApi.skillFileUrl(skill.plugin, skill.id, file), name, onDelete: null });
+    const url = skill.server
+      ? claudeApi.mcpSkillFileUrl(skill.server, `${skill.root}${file}`, chat.workingPath)
+      : claudeApi.skillFileUrl(skill.plugin, skill.id, file);
+    openFilePreview({ url, name, onDelete: null });
   };
 
   $effect(() => {
@@ -748,7 +751,8 @@
   $effect(() => {
     const skill = skillSheet;
     skillFiles = null;
-    if (skill) void claudeApi.skillFiles(skill.plugin, skill.id).then((files) => (skillFiles = files));
+    if (skill?.server) skillFiles = [SKILL_FILE, ...(skill.files ?? []).filter((file) => file !== SKILL_FILE)];
+    else if (skill) void claudeApi.skillFiles(skill.plugin, skill.id).then((files) => (skillFiles = files));
   });
 
   $effect(() => {
@@ -959,7 +963,7 @@
                 <ClaudeCard
                   title={skill.name}
                   enabled={skill.enabled}
-                  source={skill.pluginName}
+                  source={skill.server ? joined(t("MCP"), skill.pluginName) : skill.pluginName}
                   description={skill.description}
                   selected={sidePanel && !!skillSheet && skillKey(skillSheet) === skillKey(skill)}
                   onclick={() => (skillSheet = skill)}
@@ -1129,7 +1133,7 @@
           <p class="text-body-sm text-on-surface-variant">{skill.description}</p>
         </CardPanel>
       {/if}
-      <CardPanel onclick={() => openSkillFile(skill, SKILL_FILE, `${skill.id} - ${SKILL_FILE}`)}>
+      <CardPanel onclick={() => openSkillFile(skill, SKILL_FILE, `${skill.server ? skill.name : skill.id} - ${SKILL_FILE}`)}>
         <p class="text-body-md">{SKILL_FILE}</p>
       </CardPanel>
       {#if references.length}
