@@ -6,10 +6,12 @@ import os
 import re
 import sys
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import httpx
 import yaml
 
 from core import paths
@@ -39,6 +41,7 @@ _INSTALLED_PLUGINS = _PLUGINS_DIR / "installed_plugins.json"
 _ENGINE = "claude-code"
 _KEYCHAIN = sys.platform == "darwin"
 _MCP_USER_SOURCE = "user"
+_MCP_PROJECT_SOURCE = "project"
 _MCP_OAUTH_TYPES = ("http", "sse")
 _MCP_FILE = ".mcp.json"
 _BUNDLES_DIR = _PLUGINS_DIR / "mcpb"
@@ -47,11 +50,17 @@ _BUNDLE_URL = "https://"
 _BUNDLE_MANIFEST = "manifest.json"
 _BUNDLE_RECORDS = "*.metadata.json"
 _MCP_AUTH_CACHE = _CLAUDE_DIR / "mcp-needs-auth-cache.json"
+_SIGN_IN_TIMEOUT = 5.0
+_SIGN_IN_PING = {"jsonrpc": "2.0", "id": 0, "method": "ping"}
+_SIGN_IN_ACCEPT = {"http": "application/json, text/event-stream", "sse": "text/event-stream"}
+_UNAUTHORIZED = 401
+_PLACEHOLDER_MARK = "${"
 _MCP_TOOL_CHARS = re.compile(r"[^A-Za-z0-9_-]")
 _CLAUDEAI_CONNECTED = "claudeAiMcpEverConnected"
 _CLAUDEAI_PREFIX = "claude.ai "
 
 _tool_labels: tuple[tuple[float, ...], dict[str, str]] = ((), {})
+_sign_in_answers: dict[str, bool] = {}
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
 _HEADER_KEYS = ("name", "description")
@@ -657,10 +666,43 @@ class _McpLogins:
     tokens: dict[str, dict[str, str]]
 
 
+def _mcp_kind(cfg: dict) -> str:
+    return cfg.get("type") or ("http" if cfg.get("url") else "stdio")
+
+
+def _sign_in_key(cfg: dict) -> str:
+    return json.dumps([_mcp_kind(cfg), cfg.get("url"), cfg.get("headers") or {}], sort_keys=True)
+
+
+def _asks_sign_in(cfg: dict) -> bool:
+    kind = _mcp_kind(cfg)
+    headers = {**{str(key): str(value) for key, value in (cfg.get("headers") or {}).items()}, "Accept": _SIGN_IN_ACCEPT[kind]}
+    try:
+        with httpx.Client(timeout=_SIGN_IN_TIMEOUT) as client, client.stream(
+            "GET" if kind == "sse" else "POST", cfg["url"], headers=headers, json=None if kind == "sse" else _SIGN_IN_PING
+        ) as answer:
+            return answer.status_code == _UNAUTHORIZED
+    except httpx.HTTPError:
+        return False
+
+
+def _signs_in(configs: dict[str, dict]) -> set[str]:
+    remote = {
+        name: cfg
+        for name, cfg in configs.items()
+        if _mcp_kind(cfg) in _MCP_OAUTH_TYPES and isinstance(cfg.get("url"), str) and _PLACEHOLDER_MARK not in _sign_in_key(cfg)
+    }
+    unknown = {_sign_in_key(cfg): cfg for cfg in remote.values() if _sign_in_key(cfg) not in _sign_in_answers}
+    if unknown:
+        with ThreadPoolExecutor(len(unknown)) as pool:
+            _sign_in_answers.update(zip(unknown, pool.map(_asks_sign_in, unknown.values())))
+    return {name for name, cfg in remote.items() if _sign_in_answers[_sign_in_key(cfg)]}
+
+
 def _mcp_entry(
     name: str, label: str, cfg: dict, enabled: bool, source: str, logins: _McpLogins, icon: Path | str | None
 ) -> dict:
-    kind = cfg.get("type") or ("http" if cfg.get("url") else "stdio")
+    kind = _mcp_kind(cfg)
     detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
     return {
         "name": name,
@@ -764,7 +806,7 @@ def _declared_mcp(folder: str) -> list[DeclaredMcp]:
         ),
         *(DeclaredMcp(name, name, cfg, True, "local", name in muted) for name, cfg in _mcp_map(local.get("mcpServers")).items()),
         *(
-            DeclaredMcp(name, name, cfg, name not in skipped, "project", name in muted)
+            DeclaredMcp(name, name, cfg, name not in skipped, _MCP_PROJECT_SOURCE, name in muted)
             for name, cfg in _mcp_map(_read_json(Path(folder) / _MCP_FILE).get("mcpServers")).items()
         ),
         *(
@@ -798,12 +840,14 @@ def declared_mcp(cwd: str | None) -> list[DeclaredMcp]:
 
 def list_mcp_servers(cwd: str | None = None) -> list[dict]:
     folder = _mcp_folder(cwd)
-    logins = _McpLogins(
-        needs_auth=set(_read_json(_MCP_AUTH_CACHE)),
-        tokens={account: accounts.mcp_tokens(account) for account in accounts.known_ids()},
-    )
     declared = _declared_mcp(folder)
     disabled = {name: cfg for name, cfg in claude_manage.disabled_mcp_servers().items() if isinstance(cfg, dict)}
+    tokens = {account: accounts.mcp_tokens(account) for account in accounts.known_ids()}
+    flagged = set(_read_json(_MCP_AUTH_CACHE))
+    known = flagged | {name for held in tokens.values() for name in held}
+    configs = {**disabled, **{server.name: server.config for server in declared if server.source != _MCP_PROJECT_SOURCE}}
+    unknown = {name: cfg for name, cfg in configs.items() if name not in known and not cfg.get("oauth")}
+    logins = _McpLogins(needs_auth=flagged | _signs_in(unknown), tokens=tokens)
     uris = asset_icons.declared_uris([server.name for server in declared] + list(disabled))
     items = [
         _mcp_entry(
