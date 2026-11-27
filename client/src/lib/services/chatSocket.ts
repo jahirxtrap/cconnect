@@ -923,6 +923,7 @@ export class ChatSocket {
           agents: event.agents ?? null,
           mcpServers: event.mcp_servers ?? null,
           errors: event.errors ?? 0,
+          pending: event.pending === true,
         };
       case "rejected":
         return { type: "rejected", request: event.request ?? null, id: event.id ?? null, message: event.message ?? "" };

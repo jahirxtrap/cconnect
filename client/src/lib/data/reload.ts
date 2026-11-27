@@ -10,7 +10,10 @@ export interface Reload {
   agents: number | null;
   mcpServers: number | null;
   errors: number;
+  pending: boolean;
 }
+
+const SESSION_RELOAD = "reload-session";
 
 const RELOAD_TEXT: Record<string, { done: string; next: string; failed: string }> = {
   "reload-plugins": { done: "PLUGINS_RELOADED", next: "PLUGINS_RELOAD_NEXT", failed: "PLUGINS_RELOAD_FAILED" },
@@ -20,6 +23,16 @@ const RELOAD_TEXT: Record<string, { done: string; next: string; failed: string }
 const counted = (key: string, count: number | null) => count !== null && plural(key, count, count);
 
 export const reloadText = (reload: Reload): string | null => {
+  if (reload.command === SESSION_RELOAD)
+    return t(
+      !reload.resident
+        ? "SESSION_RELOAD_NEXT"
+        : reload.pending
+          ? "SESSION_RELOAD_PENDING"
+          : reload.failed
+            ? "SESSION_RELOAD_FAILED"
+            : "SESSION_RELOADED",
+    );
   const text = RELOAD_TEXT[reload.command];
   if (!text) return null;
   if (!reload.resident) return t(text.next);

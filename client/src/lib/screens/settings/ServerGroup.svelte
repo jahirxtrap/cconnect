@@ -352,6 +352,7 @@
     outputStyle={snapshot.outputStyle}
     streaming={snapshot.streaming}
     todoTools={snapshot.todoTools}
+    codeMode={snapshot.codeMode}
     chatLanguage={snapshot.chatLanguage}
     alwaysThinking={snapshot.alwaysThinking}
     autoCompact={snapshot.autoCompact}
@@ -368,6 +369,7 @@
         output_style: values.outputStyle,
         streaming: values.streaming,
         todo_tools: values.todoTools,
+        code_mode: values.codeMode,
         chat_language: values.chatLanguage,
         always_thinking: values.alwaysThinking,
         auto_compact: values.autoCompact,

@@ -1,57 +1,93 @@
 <script lang="ts" module>
   import Activity from "@lucide/svelte/icons/activity";
   import Blocks from "@lucide/svelte/icons/blocks";
+  import Bot from "@lucide/svelte/icons/bot";
   import Brain from "@lucide/svelte/icons/brain";
   import FishingHook from "@lucide/svelte/icons/fishing-hook";
+  import MessageSquareQuote from "@lucide/svelte/icons/message-square-quote";
+  import SquareSlash from "@lucide/svelte/icons/square-slash";
   import Store from "@lucide/svelte/icons/store";
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
-  import { MCP_USER_SOURCE } from "$lib/services/claudeApi";
+  import { CUSTOM_BUILTIN, CUSTOM_PLUGIN, MCP_USER_SOURCE } from "$lib/services/claudeApi";
   import type { IconSource } from "$lib/ui/icons";
 
   export const CLAUDE_KINDS = [
     "plugins",
-    "skills",
-    "mcp",
-    "hooks",
     "marketplaces",
+    "mcp",
+    "skills",
+    "hooks",
+    "styles",
+    "commands",
+    "agents",
     "memories",
     "status",
   ] as const;
 
   export type ClaudeKind = (typeof CLAUDE_KINDS)[number];
 
+  export const CLAUDE_GROUPS: { label: string; kinds: ClaudeKind[] }[] = [
+    { label: "EXTENSIONS", kinds: ["plugins", "marketplaces", "mcp", "skills", "hooks"] },
+    { label: "CUSTOMIZATION", kinds: ["styles", "commands", "agents", "memories"] },
+  ];
+
   export const CLAUDE_MEMORY = "claude";
 
   const memoryOf = (kind: ClaudeKind) => `${CLAUDE_MEMORY}:${kind}`;
 
-  export const CLAUDE_TABS: Record<ClaudeKind, string> = {
+  export const CLAUDE_TITLES: Record<ClaudeKind, string> = {
     plugins: "PLUGINS",
-    skills: "SKILLS",
-    mcp: "MCP",
-    hooks: "HOOKS",
     marketplaces: "MARKETPLACES",
+    mcp: "MCP_SERVERS",
+    skills: "SKILLS",
+    hooks: "HOOKS",
+    styles: "STYLES",
+    commands: "COMMANDS",
+    agents: "CLAUDE_AGENTS",
     memories: "MEMORIES",
     status: "SERVICE_STATUS",
   };
 
   export const CLAUDE_ICONS: Record<ClaudeKind, IconSource> = {
     plugins: Blocks,
-    skills: Wand,
-    mcp: Unplug,
-    hooks: FishingHook,
     marketplaces: Store,
+    mcp: Unplug,
+    skills: Wand,
+    hooks: FishingHook,
+    styles: MessageSquareQuote,
+    commands: SquareSlash,
+    agents: Bot,
     memories: Brain,
     status: Activity,
   };
 
   const CLAUDE_EMPTY: Record<Exclude<ClaudeKind, "status">, string> = {
     plugins: "NO_PLUGINS",
-    skills: "NO_SKILLS",
-    mcp: "NO_MCP_SERVERS",
-    hooks: "NO_HOOKS",
     marketplaces: "NO_MARKETPLACES",
+    mcp: "NO_MCP_SERVERS",
+    skills: "NO_SKILLS",
+    hooks: "NO_HOOKS",
+    styles: "NO_STYLES",
+    commands: "NO_COMMANDS",
+    agents: "NO_CLAUDE_AGENTS",
     memories: "NO_MEMORIES",
+  };
+
+  const CUSTOM_SOURCES = [CUSTOM_BUILTIN, MCP_USER_SOURCE, "project", CUSTOM_PLUGIN];
+
+  const CUSTOM_FILTER_LABELS: Record<string, string> = {
+    [CUSTOM_BUILTIN]: "CUSTOM_BUILTINS",
+    [MCP_USER_SOURCE]: "MCP_SOURCE_USER",
+    project: "PROJECT",
+    [CUSTOM_PLUGIN]: "PLUGINS",
+  };
+
+  const CUSTOM_SOURCE_LABELS: Record<string, string> = {
+    [CUSTOM_BUILTIN]: "CUSTOM_BUILTIN",
+    [MCP_USER_SOURCE]: "MCP_SOURCE_USER",
+    project: "PROJECT",
+    [CUSTOM_PLUGIN]: "PLUGIN",
   };
 
   export const STATUS_PAGE = "https://status.claude.com";
@@ -80,10 +116,13 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
+  import { settings } from "$lib/data/settings.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { compareText, formatSeconds, joined, SEPARATOR } from "$lib/data/format";
   import { holdRefresh } from "$lib/data/inflight";
-  import { projectLabel, sessionIdPreview, sessionLabel } from "$lib/data/models";
+  import { sessionIdPreview, sessionLabel } from "$lib/data/models";
+  import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { matchesLabel } from "$lib/data/textMatch";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
@@ -100,10 +139,17 @@
   import SignInDialog from "./SignInDialog.svelte";
   import {
     claudeApi,
+    CUSTOM_KINDS,
+    CUSTOM_SCOPES,
     pluginKey,
     type ActionResult,
     type CatalogPlugin,
     type ChatMod,
+    type Customization,
+    type CustomizationDraft,
+    type Customizations,
+    type CustomKind,
+    type CustomScope,
     type Extensions,
     type Hook,
     type Marketplace,
@@ -153,6 +199,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import { cssLength, PAGE_INSET, rem } from "$lib/ui/rem";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import CustomizationDialog, { CUSTOM_TEXTS } from "./CustomizationDialog.svelte";
   import { modAreas, modCommands } from "./modAreas";
   import PluginOptionsDialog from "./PluginOptionsDialog.svelte";
   import PluginReloadDialog from "./PluginReloadDialog.svelte";
@@ -188,6 +235,7 @@
   let mcpServers = $state<McpServer[] | null>(null);
   let hooks = $state<Hook[] | null>(null);
   let memories = $state<Memories | null>(null);
+  let customs = $state<Customizations | null>(null);
   let service = $state<ServiceStatus | null>(null);
   let loaded = $state(false);
   let refreshing = $state(false);
@@ -197,12 +245,19 @@
   let installOutput = $state<{ printed: string | null; notes: string[] } | null>(null);
   let reloadHeld = $state(false);
 
-  let memoriesProject = $state<string | null>(null);
+  let project = $state<string | null>(null);
   let ownQuery = $state("");
   let searching = $state(false);
   let skillSheet = $state<Skill | null>(null);
   let skillFiles = $state<string[] | null>(null);
   let hookSheet = $state<Hook | null>(null);
+  let customSheet = $state<Customization | null>(null);
+  let customFilter = $state<string | null>(null);
+  let editing = $state.raw<{ item: Customization | null } | null>(null);
+  let editBusy = $state(false);
+  let editError = $state<string | null>(null);
+  let confirmCustomDelete = $state<Customization | null>(null);
+  let styleBusy = $state(false);
 
   let pluginMenu = $state<Plugin | null>(null);
   let pluginReview = $state<PluginReview | null>(null);
@@ -237,8 +292,20 @@
   let areaWidth = $state(0);
   let viewHeight = $state(0);
 
-  const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "hooks", "marketplaces"];
-  const FILTER_KINDS: ClaudeKind[] = ["plugins", "mcp", "hooks"];
+  const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "hooks", "marketplaces", ...CUSTOM_KINDS];
+  const FILTER_KINDS: ClaudeKind[] = ["plugins", "mcp", "hooks", ...CUSTOM_KINDS];
+
+  const customKind = $derived(
+    (CUSTOM_KINDS as readonly string[]).includes(kind) ? (kind as CustomKind) : null,
+  );
+
+  const projectScoped = $derived(kind === "memories" || customKind !== null);
+
+  const activeProject = $derived(settings.lockedProject || project);
+
+  const projectPath = $derived(
+    chat.historyProjects.find((item) => item.projectKey === activeProject)?.path ?? chat.workingPath,
+  );
 
   const sidePanel = $derived(
     embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + PANEL_REM) * rem() + cssLength(PAGE_INSET),
@@ -247,6 +314,32 @@
   const filterable = $derived(loaded && FILTER_KINDS.includes(kind));
 
   const skillKey = (skill: Skill) => `${skill.server ?? skill.plugin}/${skill.id}`;
+
+  const customKey = (item: Customization) => `${item.source}/${item.plugin ?? ""}/${item.file ?? item.name}`;
+
+  const customScope = (item: Customization) =>
+    (CUSTOM_SCOPES as readonly string[]).includes(item.source) ? (item.source as CustomScope) : null;
+
+  const customOrigin = (item: Customization) =>
+    item.source === CUSTOM_PLUGIN
+      ? joined(t(CUSTOM_SOURCE_LABELS[item.source]), item.pluginName)
+      : t(CUSTOM_SOURCE_LABELS[item.source] ?? item.source);
+
+  const customSource = (item: Customization) => {
+    const scope = customScope(item);
+    if (!scope || !customKind || !customs) return customOrigin(item);
+    return joined(customOrigin(item), scope === "project" ? customs.project : customs.folders[customKind][scope]);
+  };
+
+  const activeStyle = $derived(serverSettings.snapshot?.outputStyle ?? null);
+
+  const inUse = (item: Customization) => customKind === "styles" && item.name === activeStyle;
+
+  const useStyle = async (item: Customization) => {
+    styleBusy = true;
+    if (!(await serverSettings.update({ output_style: item.name }))) actionError = t("CONNECTION_ERROR");
+    styleBusy = false;
+  };
 
   const panelTitle = $derived(
     kind === "plugins"
@@ -259,24 +352,12 @@
             ? hookSheet?.event
             : kind === "marketplaces"
               ? marketMenu?.name
-              : undefined,
+              : customKind && customSheet
+                ? customSheet.name
+                : undefined,
   );
 
-  const title = $derived(
-    kind === "plugins"
-      ? t("PLUGINS")
-      : kind === "skills"
-        ? t("SKILLS")
-        : kind === "mcp"
-          ? t("MCP_SERVERS")
-          : kind === "hooks"
-            ? t("HOOKS")
-            : kind === "marketplaces"
-              ? t("MARKETPLACES")
-              : kind === "memories"
-                ? t("MEMORIES")
-                : t("SERVICE_STATUS"),
-  );
+  const title = $derived(t(CLAUDE_TITLES[kind]));
 
   const load = async () => {
     if (kind === "plugins" || kind === "marketplaces") {
@@ -289,9 +370,36 @@
       mcpServers = await claudeApi.mcp(chat.workingPath);
     }
     else if (kind === "hooks") hooks = await claudeApi.hooks(chat.workingPath);
-    else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
+    else if (kind === "memories") memories = await claudeApi.memories(activeProject);
     else if (kind === "status") service = await claudeApi.status();
+    else if (customKind) customs = await claudeApi.customizations(projectPath);
     loaded = true;
+  };
+
+  const saveCustom = async (draft: CustomizationDraft) => {
+    if (!customKind) return;
+    editBusy = true;
+    editError = null;
+    const result = await claudeApi.saveCustomization(customKind, draft, projectPath);
+    editBusy = false;
+    if (!result.ok) {
+      editError = t(result.error === "taken" ? "CUSTOM_NAME_TAKEN" : "CONNECTION_ERROR");
+      return;
+    }
+    editing = null;
+    await load();
+    const saved = customs?.[customKind].find((item) => item.source === draft.scope && item.file === result.file);
+    if (customSheet && saved) customSheet = saved;
+  };
+
+  const deleteCustom = async (item: Customization) => {
+    confirmCustomDelete = null;
+    const scope = customScope(item);
+    if (!customKind || !scope || !item.file) return;
+    if (!(await claudeApi.deleteCustomization(customKind, scope, item.file, projectPath)))
+      actionError = t("CONNECTION_ERROR");
+    if (customSheet && customKey(customSheet) === customKey(item)) customSheet = null;
+    await load();
   };
 
   const refresh = async () => {
@@ -623,11 +731,31 @@
     ),
   );
 
+  const customList = $derived(customKind ? (customs?.[customKind] ?? []) : []);
+
+  const customFilters = $derived.by((): { source: string | null; label: string; count: number }[] => [
+    { source: null, label: t("ALL"), count: customList.length },
+    ...CUSTOM_SOURCES.map((source) => ({
+      source,
+      label: t(CUSTOM_FILTER_LABELS[source]),
+      count: customList.filter((item) => item.source === source).length,
+    })).filter((item) => item.count > 0),
+  ]);
+
+  const filteredCustoms = $derived(
+    customList.filter(
+      (item) =>
+        (customFilter === null || item.source === customFilter) &&
+        matches(item.name, item.description, item.pluginName),
+    ),
+  );
+
   const filtering = $derived(
     !!needle ||
       (kind === "plugins" && pluginFilter.kind !== "all") ||
       (kind === "mcp" && mcpFilter !== null) ||
-      (kind === "hooks" && hookFilter !== null),
+      (kind === "hooks" && hookFilter !== null) ||
+      (customKind !== null && customFilter !== null),
   );
 
   const failed = $derived(
@@ -642,7 +770,9 @@
               ? hooks === null
               : kind === "memories"
                 ? memories === null
-                : service === null),
+                : customKind
+                  ? customs === null
+                  : service === null),
   );
 
   const shownCount = $derived(
@@ -656,7 +786,9 @@
             ? filteredHooks.length
             : kind === "marketplaces"
               ? filteredMarkets.length
-              : memoryList.length,
+              : customKind
+                ? filteredCustoms.length
+                : memoryList.length,
   );
 
   $effect(() => {
@@ -680,6 +812,10 @@
       const current = marketMenu;
       if (!current || !filteredMarkets.some((market) => market.name === current.name))
         marketMenu = filteredMarkets[0] ?? null;
+    } else if (customKind) {
+      const current = customSheet;
+      const listed = current && filteredCustoms.find((item) => customKey(item) === customKey(current));
+      customSheet = listed ?? filteredCustoms[0] ?? null;
     }
   });
 
@@ -693,6 +829,7 @@
       mcpMenu = null;
       hookSheet = null;
       marketMenu = null;
+      customSheet = null;
     }
     sideShown = shown;
   });
@@ -721,11 +858,11 @@
   };
 
   const openMemory = (scope: string, name: string) => {
-    const project = scope === "global" ? null : memoriesProject;
+    const owner = scope === "global" ? null : activeProject;
     openFilePreview({
-      url: claudeApi.memoryUrl(scope, project, name),
+      url: claudeApi.memoryUrl(scope, owner, name),
       name,
-      onDelete: () => void claudeApi.deleteMemory(scope, project, name).then(load),
+      onDelete: () => void claudeApi.deleteMemory(scope, owner, name).then(load),
       links: { resolve: memoryLink, wiki: true },
     });
   };
@@ -738,9 +875,15 @@
   };
 
   $effect(() => {
+    if (kind === "styles") serverSettings.ensure();
+  });
+
+  $effect(() => {
+    if (projectScoped && project === null) project = chat.contextProject;
+  });
+
+  $effect(() => {
     void kind;
-    if (kind === "memories" && memoriesProject === null)
-      memoriesProject = chat.defaultProjectKey(chat.historyProjects) ?? chat.projectKey;
     void load();
   });
 
@@ -830,6 +973,17 @@
           />
         {/each}
       </div>
+    {:else if customKind && loaded}
+      <div class={FILTER_ROW_CLASS}>
+        {#each customFilters as item (item.source ?? "")}
+          <SelectChip
+            label={item.label}
+            count={item.count}
+            selected={item.source === customFilter}
+            onclick={() => (customFilter = item.source)}
+          />
+        {/each}
+      </div>
     {/if}
   {/snippet}
 
@@ -871,6 +1025,17 @@
       >
         <Plus />
       </TooltipIconButton>
+    {:else if customKind}
+      <TooltipIconButton
+        label={t(CUSTOM_TEXTS[customKind].create)}
+        enabled={!!customs}
+        onclick={() => {
+          editError = null;
+          editing = { item: null };
+        }}
+      >
+        <Plus />
+      </TooltipIconButton>
     {:else if kind === "status"}
       <TooltipIconButton label={t("STATUS_OPEN_PAGE")} onclick={() => openExternal(STATUS_PAGE)}>
         <ExternalLink />
@@ -887,15 +1052,17 @@
     {/if}
   {/snippet}
 
-  {#if kind === "memories" && chat.historyProjects.length}
+  {#if projectScoped && chat.historyProjects.length}
     <div class="px-(--page-inset) pb-3 {embedded ? 'max-w-md' : ''}">
-      <SelectField
-        label=""
-        selected={memoriesProject ?? ""}
-        options={chat.historyProjects.map((item) => ({ value: item.projectKey, label: projectLabel(item) }))}
+      <ProjectSelector
+        projects={chat.historyProjects}
+        selected={activeProject}
+        allowAll={false}
+        loading={chat.historyLoading}
+        owner={chat}
         onSelect={(key) => {
-          memoriesProject = key;
-          void claudeApi.memories(key).then((value) => (memories = value));
+          project = key;
+          customFilter = null;
         }}
       />
     </div>
@@ -1004,6 +1171,17 @@
                   onclick={() => (marketMenu = market)}
                 />
               {/each}
+            {:else if customKind}
+              {#each filteredCustoms as item (customKey(item))}
+                <ClaudeCard
+                  title={item.name}
+                  tag={inUse(item) ? t("STYLE_IN_USE") : null}
+                  source={customSource(item)}
+                  description={item.description}
+                  selected={sidePanel && !!customSheet && customKey(customSheet) === customKey(item)}
+                  onclick={() => (customSheet = item)}
+                />
+              {/each}
             {:else}
               {#each memoryList as memory (`${memory.scope}/${memory.name}`)}
                 <ClaudeCard
@@ -1037,6 +1215,8 @@
                     <span class="ml-auto flex shrink-0">{@render pluginSwitch(pluginMenu)}</span>
                   {:else if kind === "mcp" && mcpMenu}
                     <span class="ml-auto flex shrink-0">{@render mcpSwitch(mcpMenu)}</span>
+                  {:else if customSheet && inUse(customSheet)}
+                    <span class={TAG_CLASS}>{t("STYLE_IN_USE")}</span>
                   {/if}
                 </div>
                 <div class="flex flex-1 flex-col gap-3.5 [--c-card:var(--c-hover)]">
@@ -1050,6 +1230,8 @@
                     {@render hookBody(hookSheet)}
                   {:else if kind === "marketplaces" && marketMenu}
                     {@render marketBody(marketMenu)}
+                  {:else if customKind && customSheet}
+                    {@render customBody(customSheet)}
                   {/if}
                 </div>
               </div>
@@ -1159,6 +1341,94 @@
     {/snippet}
     {@render skillBody(skill)}
   </CompactDialog>
+{/if}
+
+{#snippet customBody(item: Customization)}
+  {#if item.description}
+    <p class="text-body-md text-on-surface-variant">{item.description}</p>
+  {/if}
+  <FactList
+    rows={[
+      { label: t("SCOPE"), text: customOrigin(item) },
+      { label: t("FILE"), text: item.path },
+      {
+        label: t("CODING_INSTRUCTIONS"),
+        text:
+          item.keepCodingInstructions === null
+            ? null
+            : t(item.keepCodingInstructions ? "CODING_INSTRUCTIONS_KEPT" : "CODING_INSTRUCTIONS_DROPPED"),
+      },
+      { label: t("MODEL"), text: item.model },
+      { label: t("COMMAND_ARGUMENTS"), text: item.argumentHint },
+    ].filter((fact) => fact.text)}
+  />
+  {@const usable = customKind === "styles" && !inUse(item) && activeStyle !== null}
+  {#if usable && item.source === "project"}
+    <p class="text-body-sm text-on-surface-variant">{t("STYLE_PROJECT_ONLY")}</p>
+  {/if}
+  {#if styleBusy}
+    <LinearProgress />
+  {/if}
+  {#if usable || customScope(item)}
+    <div class="mt-auto flex flex-col gap-2.5">
+      {#if usable}
+        <ActionButton text={t("STYLE_USE")} enabled={!styleBusy} onclick={() => void useStyle(item)} class="w-full" />
+      {/if}
+      {#if customScope(item)}
+        <ActionButton
+          text={t("EDIT")}
+          onclick={() => {
+            editError = null;
+            editing = { item };
+          }}
+          class="w-full"
+        />
+        <ActionButton text={t("DELETE")} danger onclick={() => (confirmCustomDelete = item)} class="w-full" />
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#if customSheet && !sidePanel}
+  {@const item = customSheet}
+  <CompactDialog title={item.name} onDismiss={() => (customSheet = null)}>
+    {#snippet titleTrailing()}
+      {#if inUse(item)}
+        <span class={TAG_CLASS}>{t("STYLE_IN_USE")}</span>
+      {/if}
+    {/snippet}
+    {#snippet buttons()}
+      <Button onclick={() => (customSheet = null)} variant="outlined">{t("CANCEL")}</Button>
+    {/snippet}
+    <div class="flex flex-col gap-3.5">
+      {@render customBody(item)}
+    </div>
+  </CompactDialog>
+{/if}
+
+{#if editing && customKind && customs}
+  <CustomizationDialog
+    kind={customKind}
+    item={editing.item}
+    folders={customs.folders[customKind]}
+    scopeLabels={{ user: t(CUSTOM_SOURCE_LABELS.user), project: t(CUSTOM_SOURCE_LABELS.project) }}
+    busy={editBusy}
+    error={editError}
+    onSave={(draft) => void saveCustom(draft)}
+    onDismiss={() => (editing = null)}
+  />
+{/if}
+
+{#if confirmCustomDelete}
+  {@const item = confirmCustomDelete}
+  <ConfirmDialog
+    title={t("DELETE")}
+    text={t("DELETE_FILE_CONFIRM", item.name)}
+    confirmLabel={t("DELETE")}
+    danger
+    onConfirm={() => void deleteCustom(item)}
+    onDismiss={() => (confirmCustomDelete = null)}
+  />
 {/if}
 
 {#snippet pluginSwitch(plugin: Plugin)}

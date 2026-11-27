@@ -264,6 +264,12 @@ export const hooksValue = (): string =>
 export const marketplacesValue = (): string =>
   claudeStatus.extensions ? String(claudeStatus.extensions.marketplaces.length) : "";
 
+export const commandsValue = (): string =>
+  claudeStatus.customizations ? String(claudeStatus.customizations.commands.length) : "";
+
+export const claudeAgentsValue = (): string =>
+  claudeStatus.customizations ? String(claudeStatus.customizations.agents.length) : "";
+
 export const memoriesValue = (): string => {
   const chat = tabs.state;
   const project = chat.contextProject;

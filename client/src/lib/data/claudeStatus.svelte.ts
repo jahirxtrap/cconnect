@@ -8,6 +8,7 @@ import { type AccountsSnapshot } from "$lib/services/accountsApi";
 import { backend } from "$lib/services/backend.svelte";
 import {
   claudeApi,
+  type Customizations,
   type Extensions,
   type Hook,
   type McpServer,
@@ -26,6 +27,7 @@ interface ClaudeSnapshot {
   skills: Skill[] | null;
   mcpServers: McpServer[] | null;
   hooks: Hook[] | null;
+  customizations: Customizations | null;
   service: ServiceStatus | null;
   accounts: AccountsSnapshot | null;
   usage: Usage | null;
@@ -39,6 +41,7 @@ const blank: ClaudeSnapshot = {
   skills: null,
   mcpServers: null,
   hooks: null,
+  customizations: null,
   service: null,
   accounts: null,
   usage: null,
@@ -52,6 +55,7 @@ class ClaudeStatus {
   skills = $state<Skill[] | null>(null);
   mcpServers = $state<McpServer[] | null>(null);
   hooks = $state<Hook[] | null>(null);
+  customizations = $state<Customizations | null>(null);
   service = $state<ServiceStatus | null>(null);
   accounts = $state<AccountsSnapshot | null>(null);
   usage = $state<Usage | null>(null);
@@ -106,19 +110,22 @@ class ClaudeStatus {
       this.skills = null;
       this.mcpServers = null;
       this.hooks = null;
+      this.customizations = null;
       return;
     }
-    const [extensions, skills, mcpServers, hooks] = await Promise.all([
+    const [extensions, skills, mcpServers, hooks, customizations] = await Promise.all([
       claudeApi.extensions(),
       claudeApi.skills(),
       claudeApi.mcp(),
       claudeApi.hooks(),
+      claudeApi.customizations(),
     ]);
     if (at !== backend.activeId) return;
     this.extensions = extensions;
     this.skills = skills;
     this.mcpServers = mcpServers;
     this.hooks = hooks;
+    this.customizations = customizations;
   }
 
   async #loadService() {
@@ -184,6 +191,7 @@ class ClaudeStatus {
       skills: this.skills,
       mcpServers: this.mcpServers,
       hooks: this.hooks,
+      customizations: this.customizations,
       service: this.service,
       accounts: this.accounts,
       usage: this.usage,
@@ -198,6 +206,7 @@ class ClaudeStatus {
     this.skills = snapshot.skills;
     this.mcpServers = snapshot.mcpServers;
     this.hooks = snapshot.hooks;
+    this.customizations = snapshot.customizations;
     this.service = snapshot.service;
     this.accounts = snapshot.accounts;
     this.usage = snapshot.usage;

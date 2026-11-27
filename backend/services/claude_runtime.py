@@ -30,7 +30,7 @@ _SHARE_RULE = f"{_MCP_PREFIX}cconnect__{SHARE_TOOL}"
 _PACKS_RULE = f"{_MCP_PREFIX}cconnect__{PACKS_TOOL}"
 
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
-_RESTARTING_CLI_SETTINGS = ("output_style", "instruction_files", "todo_tools")
+_RESTARTING_CLI_SETTINGS = ("output_style", "instruction_files", "todo_tools", "code_mode")
 _OUTPUT_SHARE = 4
 _MIN_OUTPUT_TOKENS = 1024
 CHANNEL_ENV = "CCONNECT_CHANNEL"
@@ -200,6 +200,8 @@ def _cli_settings(scope: dict) -> dict[str, Any]:
     overrides: dict[str, Any] = {"permissions": {"deny": deny}}
     if not scope["memory"]:
         overrides["autoMemoryEnabled"] = False
+    if cli_settings.get("code_mode"):
+        overrides["env"] = {cli_settings.CODE_MODE_VAR: "1"}
     return overrides
 
 
@@ -856,21 +858,27 @@ class CliControls:
         return True
 
 
-async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False, retune=None) -> AsyncIterator[Any]:
-    """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
-    fresh = not resident.connected
-    if fresh:
+async def _connect_resident(resident, options) -> None:
+    """Start the standing CLI when it is not running, once even when a warm start and a turn both ask."""
+    async with resident.connecting:
+        if resident.connected:
+            return
         await asyncio.to_thread(plugin_secrets.reconcile)
         resident.lazy = await mcp_lazy.open_for(options, lambda: resident.session_info().get("session_id"))
         await resident.connect(resident.lazy.apply(options) if resident.lazy is not None else options)
+        resident.listen()
+        await resident.attach_surface()
+
+
+async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False, retune=None) -> AsyncIterator[Any]:
+    """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
+    await _connect_resident(resident, options)
     from claude_agent_sdk import ResultMessage
 
     client = resident.client
     if on_transport is not None:
         on_transport(CliControls(getattr(client, "_transport", None)))
     inbox = resident.listen()
-    if fresh:
-        await resident.attach_surface()
     if retune:
         await resident.retune(retune)
     if not adopt:
@@ -935,6 +943,7 @@ async def run_prompt(
     seen_notices: Optional[set] = None,
     unlocked: Callable[[], bool] = _locked,
     channel: Optional[str] = None,
+    warm: bool = False,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -1064,6 +1073,8 @@ async def run_prompt(
         }
         if resident.connected and (resume_at or fork):
             await resident.close("rewinding" if resume_at else "forking")
+        elif resident.connected and resident.restart_pending and not tasks_alive:
+            await resident.close("restart requested")
         elif resident.connected and resident.mark != mark:
             running = resident.mark or {}
             changed = [key for key in mark if running.get(key) != mark[key]]
@@ -1074,6 +1085,11 @@ async def run_prompt(
             else:
                 await resident.close(", ".join(sorted(changed)) + " changed")
         resident.mark = mark
+
+    if warm:
+        if resident is not None:
+            await _connect_resident(resident, options)
+        return
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 

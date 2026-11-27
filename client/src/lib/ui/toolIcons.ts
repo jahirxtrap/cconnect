@@ -33,6 +33,7 @@ const TOOL_ICONS: Record<string, IconSource> = {
   Grep: Search,
   Glob: Search,
   ToolSearch: Search,
+  searchTools: Search,
   Search: Search,
   WebFetch: Globe,
   WebSearch: Globe,

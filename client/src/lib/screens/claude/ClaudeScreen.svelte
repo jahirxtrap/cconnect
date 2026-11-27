@@ -4,6 +4,7 @@
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Server from "@lucide/svelte/icons/server";
+  import Settings from "@lucide/svelte/icons/settings";
   import { navigation } from "$lib/app/navigation.svelte";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { isTouch, openExternal } from "$lib/platform";
@@ -18,16 +19,21 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import ChoiceMenu from "$lib/ui/ChoiceMenu.svelte";
+  import type { IconSource } from "$lib/ui/icons";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import { cssLength, PAGE_INSET, rem } from "$lib/ui/rem";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
-  import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import { scrollbarWidth } from "$lib/ui/scrollbar";
+  import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
+  import SideNav from "$lib/ui/SideNav.svelte";
+  import SideNavItem from "$lib/ui/SideNavItem.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ClaudeDetail, {
+    CLAUDE_GROUPS,
+    CLAUDE_ICONS,
     CLAUDE_KINDS,
     CLAUDE_MEMORY,
-    CLAUDE_TABS,
+    CLAUDE_TITLES,
     STATUS_PAGE,
     type ClaudeKind,
   } from "./ClaudeDetail.svelte";
@@ -42,7 +48,6 @@
   let width = $state(0);
   let deficit = $state(0);
   let searchNeeded = $state(0);
-  let tabsNeeded = $state(0);
   let pushed = $state(false);
 
   const highlight = useHighlight();
@@ -50,9 +55,8 @@
   const detail = $derived(
     (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
   );
-  const tabbed = $derived(navigation.centered && (!tabsNeeded || width >= tabsNeeded));
+  const tabbed = $derived(navigation.centered);
   const searchFits = $derived(!searchNeeded || width >= searchNeeded);
-  const tabIds = [GENERAL, ...CLAUDE_KINDS] as const;
   const searchable = $derived(detail !== null && detail !== "status");
   const loggedAccounts = $derived(accountsStore.items.filter((account) => account.loggedIn));
   const tick = $derived(claudeRefresh.tick + (chat.connected ? 1 : 0));
@@ -76,8 +80,7 @@
     else navigation.clearSub();
   };
 
-  const selectTab = (index: number) => {
-    const id = tabIds[index];
+  const select = (id: ClaudeKind | typeof GENERAL) => {
     query = "";
     if (id === GENERAL) leave();
     else navigation.showSub(id);
@@ -110,9 +113,7 @@
     const missing = deficit;
     if (missing <= 0) return;
     untrack(() => {
-      if (!tabbed) return;
-      if (searchFits) searchNeeded = width + missing;
-      else tabsNeeded = width + missing;
+      if (tabbed && searchFits) searchNeeded = width + missing;
     });
   });
 
@@ -144,6 +145,10 @@
   {#if !isTouch}
     <ClaudeActions />
   {/if}
+{/snippet}
+
+{#snippet navItem(id: ClaudeKind | typeof GENERAL, label: string, icon: IconSource)}
+  <SideNavItem {label} {icon} current={(detail ?? GENERAL) === id} onclick={() => select(id)} />
 {/snippet}
 
 {#snippet sections()}
@@ -182,13 +187,6 @@
           </div>
         {/if}
       {/snippet}
-      {#snippet controls()}
-        <SegmentedButtons
-          options={[t("SETTINGS_GENERAL"), ...CLAUDE_KINDS.map((kind) => t(CLAUDE_TABS[kind]))]}
-          selected={detail ? tabIds.indexOf(detail) : 0}
-          onSelect={selectTab}
-        />
-      {/snippet}
       {#snippet actions()}
         {#if detail === "status"}
           <TooltipIconButton label={t("STATUS_OPEN_PAGE")} onclick={() => openExternal(STATUS_PAGE)}>
@@ -198,13 +196,28 @@
         {@render sharedActions()}
       {/snippet}
     </AppTopBar>
-    {#if detail}
-      {#key detail}
-        <ClaudeDetail kind={detail} embedded {query} onClose={leave} />
-      {/key}
-    {:else}
-      {@render sections()}
-    {/if}
+    <div class="flex min-h-0 flex-1 pl-(--page-inset)">
+      <SideNav>
+        {@render navItem(GENERAL, t("SETTINGS_GENERAL"), Settings)}
+        {#each CLAUDE_GROUPS as group (group.label)}
+          <p class="flex h-8 shrink-0 items-end px-2.5 pb-1 {SECTION_LABEL_CLASS}">{t(group.label)}</p>
+          {#each group.kinds as kind (kind)}
+            {@render navItem(kind, t(CLAUDE_TITLES[kind]), CLAUDE_ICONS[kind])}
+          {/each}
+        {/each}
+        <div class="h-2 shrink-0"></div>
+        {@render navItem("status", t(CLAUDE_TITLES.status), CLAUDE_ICONS.status)}
+      </SideNav>
+      <div class="flex min-w-0 flex-1 flex-col">
+        {#if detail}
+          {#key detail}
+            <ClaudeDetail kind={detail} embedded {query} onClose={leave} />
+          {/key}
+        {:else}
+          {@render sections()}
+        {/if}
+      </div>
+    </div>
   {:else if detail}
     <ClaudeDetail kind={detail} onClose={leave} />
   {:else}

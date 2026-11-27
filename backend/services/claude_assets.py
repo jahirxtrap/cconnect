@@ -19,9 +19,9 @@ from core.config import DEFAULT_CWD
 from core.display import joined
 from services import accounts, asset_icons, claude_manage, cli_settings
 
-_CLAUDE_DIR = Path.home() / ".claude"
-SKILLS_DIR = _CLAUDE_DIR / "skills"
-_PLUGINS_DIR = _CLAUDE_DIR / "plugins"
+CLAUDE_DIR = Path.home() / ".claude"
+SKILLS_DIR = CLAUDE_DIR / "skills"
+_PLUGINS_DIR = CLAUDE_DIR / "plugins"
 KNOWN_MARKETPLACES = _PLUGINS_DIR / "known_marketplaces.json"
 _PLUGIN_META_DIR = Path(".claude-plugin")
 _CATALOG_FILE = _PLUGIN_META_DIR / "marketplace.json"
@@ -30,12 +30,12 @@ _LOCAL_MARKETPLACES = (_FILE_MARKETPLACE, "directory")
 _MARKETPLACE_ROOT = "."
 _RELATIVE_SOURCE = "./"
 LOCAL_MARKETPLACE = "skills-dir"
-_CHAT_MODS_DIR = _CLAUDE_DIR / "dev-mods"
+_CHAT_MODS_DIR = CLAUDE_DIR / "dev-mods"
 _MANIFEST = _PLUGIN_META_DIR / "plugin.json"
 _HOOKS_FILE = "hooks/hooks.json"
 _PROJECT_KEY_RE = re.compile(r"^[A-Za-z0-9-]+$")
 _CLAUDE_JSON = Path.home() / ".claude.json"
-_SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
+_SETTINGS_FILE = CLAUDE_DIR / "settings.json"
 _SETTINGS_LOCAL_FILE = "settings.local.json"
 _INSTALLED_PLUGINS = _PLUGINS_DIR / "installed_plugins.json"
 _ENGINE = "claude-code"
@@ -49,7 +49,7 @@ _BUNDLE_SUFFIXES = (".mcpb", ".dxt")
 _BUNDLE_URL = "https://"
 _BUNDLE_MANIFEST = "manifest.json"
 _BUNDLE_RECORDS = "*.metadata.json"
-_MCP_AUTH_CACHE = _CLAUDE_DIR / "mcp-needs-auth-cache.json"
+_MCP_AUTH_CACHE = CLAUDE_DIR / "mcp-needs-auth-cache.json"
 _SIGN_IN_TIMEOUT = 5.0
 _SIGN_IN_PING = {"jsonrpc": "2.0", "id": 0, "method": "ping"}
 _SIGN_IN_ACCEPT = {"http": "application/json, text/event-stream", "sse": "text/event-stream"}
@@ -266,7 +266,7 @@ def plugin_id(plugin: dict) -> str:
     return f"{plugin['name']}@{plugin['marketplace']}"
 
 
-def _declared(manifest: dict, key: str, default: str) -> list:
+def manifest_paths(manifest: dict, key: str, default: str) -> list:
     declared = manifest.get(key)
     return [default, *(declared if isinstance(declared, list) else [declared])]
 
@@ -280,7 +280,7 @@ def _engine_range(manifest: dict) -> str | None:
 def _hook_configs(root: Path, manifest: dict) -> list[dict]:
     configs = []
     seen: set[Path] = set()
-    for source in _declared(manifest, "hooks", _HOOKS_FILE):
+    for source in manifest_paths(manifest, "hooks", _HOOKS_FILE):
         if isinstance(source, dict):
             configs.append(source)
         elif isinstance(source, str) and (path := (root / source).resolve()) not in seen:
@@ -424,20 +424,32 @@ def _skill_meta(skill_file: Path) -> dict | None:
     return (_header_fields(match.group(1)) if match else {}) or None
 
 
-def _header_fields(header: str) -> dict:
-    """The name and description of a frontmatter, read as YAML like Claude Code reads it, line by line when it is not valid YAML."""
+def _header(header: str) -> dict:
+    """A frontmatter read as YAML like Claude Code reads it, line by line when it is not valid YAML."""
     try:
         parsed = yaml.load(header, Loader=_YAML_LOADER)
     except yaml.YAMLError:
         parsed = None
     if isinstance(parsed, dict):
-        return {key: str(parsed[key]).strip() for key in _HEADER_KEYS if parsed.get(key) is not None}
+        return parsed
     fields = {}
     for line in header.splitlines():
-        key, _, value = line.partition(":")
-        if key.strip() in _HEADER_KEYS:
+        key, colon, value = line.partition(":")
+        if colon and key.strip() and not line[:1].isspace():
             fields[key.strip()] = value.strip().strip("\"'")
     return fields
+
+
+def _header_fields(header: str) -> dict:
+    parsed = _header(header)
+    return {key: str(parsed[key]).strip() for key in _HEADER_KEYS if parsed.get(key) is not None}
+
+
+def frontmatter(text: str) -> tuple[dict, str]:
+    match = _FRONTMATTER_RE.match(text)
+    if not match:
+        return {}, text
+    return _header(match.group(1)), text[match.end():].lstrip("\r\n")
 
 
 def list_skills() -> list[dict]:
@@ -510,7 +522,7 @@ def _hook_entries(config: dict, source: str, plugin: dict | None = None) -> list
 
 
 def list_hooks(cwd: str | None = None) -> list[dict]:
-    project = Path(_mcp_folder(cwd)) / _CLAUDE_DIR.name
+    project = Path(project_folder(cwd)) / CLAUDE_DIR.name
     items = []
     seen: set[Path] = set()
     for source, path in (
@@ -601,7 +613,7 @@ _REPO_MEMORIES = ("CLAUDE.md", "AGENTS.md")
 
 def _memory_file(scope: str, project_key: str, name: str) -> Path:
     if scope == "global":
-        return _CLAUDE_DIR / "CLAUDE.md"
+        return CLAUDE_DIR / "CLAUDE.md"
     if scope == "repo":
         root = _project_path(project_key)
         if root is None:
@@ -614,13 +626,13 @@ def _memory_file(scope: str, project_key: str, name: str) -> Path:
             raise ValueError("invalid project key")
         if not _MEMORY_NAME_RE.match(name or ""):
             raise ValueError("invalid memory name")
-        return _CLAUDE_DIR / "projects" / project_key / "memory" / name
+        return CLAUDE_DIR / "projects" / project_key / "memory" / name
     raise ValueError("invalid scope")
 
 
 def list_memories(project_key: str | None) -> dict:
     out: dict = {"global": [], "project": []}
-    if (_CLAUDE_DIR / "CLAUDE.md").is_file():
+    if (CLAUDE_DIR / "CLAUDE.md").is_file():
         out["global"].append({"scope": "global", "name": "CLAUDE.md", "description": None})
     if project_key:
         root = _project_path(project_key)
@@ -628,7 +640,7 @@ def list_memories(project_key: str | None) -> dict:
             file = root / name
             if file.is_file():
                 out["project"].append({"scope": "repo", "name": name, "description": str(file)})
-        memory_dir = _CLAUDE_DIR / "projects" / project_key / "memory"
+        memory_dir = CLAUDE_DIR / "projects" / project_key / "memory"
         if memory_dir.is_dir():
             for file in sorted(memory_dir.glob("*.md")):
                 meta = _skill_meta(file)
@@ -770,7 +782,7 @@ def _mcp_source(root: Path, source: object) -> dict:
 
 def _plugin_mcp(root: Path) -> dict:
     servers: dict = {}
-    for source in _declared(read_manifest(root), "mcpServers", _MCP_FILE):
+    for source in manifest_paths(read_manifest(root), "mcpServers", _MCP_FILE):
         servers.update(_mcp_source(root, source))
     return servers
 
@@ -826,20 +838,20 @@ def _declared_mcp(folder: str) -> list[DeclaredMcp]:
     ]
 
 
-def _mcp_folder(cwd: str | None) -> str:
+def project_folder(cwd: str | None) -> str:
     return cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD
 
 
 def mcp_config(name: str, cwd: str | None = None) -> dict | None:
-    return next((declared.config for declared in _declared_mcp(_mcp_folder(cwd)) if declared.name == name), None)
+    return next((declared.config for declared in _declared_mcp(project_folder(cwd)) if declared.name == name), None)
 
 
 def declared_mcp(cwd: str | None) -> list[DeclaredMcp]:
-    return _declared_mcp(_mcp_folder(cwd))
+    return _declared_mcp(project_folder(cwd))
 
 
 def list_mcp_servers(cwd: str | None = None) -> list[dict]:
-    folder = _mcp_folder(cwd)
+    folder = project_folder(cwd)
     declared = _declared_mcp(folder)
     disabled = {name: cfg for name, cfg in claude_manage.disabled_mcp_servers().items() if isinstance(cfg, dict)}
     tokens = {account: accounts.mcp_tokens(account) for account in accounts.known_ids()}
@@ -864,7 +876,7 @@ def list_mcp_servers(cwd: str | None = None) -> list[dict]:
 
 
 def mcp_icon(name: str, cwd: str | None = None) -> Path | str | None:
-    server = next((declared for declared in _declared_mcp(_mcp_folder(cwd)) if declared.name == name), None)
+    server = next((declared for declared in _declared_mcp(project_folder(cwd)) if declared.name == name), None)
     return _mcp_icon(name, server.plugin if server else None, asset_icons.declared_uris([name]))
 
 

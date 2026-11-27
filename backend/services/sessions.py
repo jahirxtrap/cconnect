@@ -1204,6 +1204,12 @@ def _reply_id(entry: dict) -> Optional[str]:
     return message.get("id") if entry.get("type") == "assistant" and isinstance(message, dict) else None
 
 
+def _host_content(entry: dict) -> Any:
+    """What a host shows of an entry: a call a Code Mode script made carries it in ``hostContent``."""
+    message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
+    return entry.get("hostContent") if entry.get("isVirtual") and entry.get("hostContent") else message.get("content")
+
+
 def _carries_only_tool_results(entry: dict) -> bool:
     message = entry.get("message")
     content = message.get("content") if isinstance(message, dict) else None
@@ -1511,6 +1517,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
 
 
 _NOTIFICATION_BLOCK_RE = re.compile(r"<task-notification>(.*?)</task-notification>", re.DOTALL)
+_CLI_EVENT_RE = re.compile(r"\s*<event\s[^>]*\bkind=")
 _SESSION_MESSAGE_RE = re.compile(r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.DOTALL)
 _AGENT_MESSAGE_RE = re.compile(r"<agent-message\b([^>]*)>(.*?)</agent-message>", re.DOTALL)
 _PLUGIN_MESSAGE_RE = re.compile(
@@ -1858,13 +1865,16 @@ def _normalize(
     agent_files: dict[str, str] = {}
     agent_results: dict[str, dict] = {}
     notified: dict[str, dict] = {}
+    host_hidden: set[str] = set()
     for entry in entries:
         queued = entry.get("content")
         if isinstance(queued, str):
             notified.update(_notified_results(queued))
         if entry.get("type") not in _TRAVELLING_TYPES:
             continue
-        content = entry.get("message", {}).get("content")
+        if not entry.get("isVirtual"):
+            host_hidden.update(entry.get("hostHiddenToolUseIds") or ())
+        content = _host_content(entry)
         notified.update(_notified_results(_text_from_content(content)))
         tur = entry.get("toolUseResult")
         aid = tur.get("agentId") if isinstance(tur, dict) else None
@@ -1954,7 +1964,7 @@ def _normalize(
                 messages.append(shown_hook)
             continue
         if etype == "queue-operation":
-            if entry.get("operation") == "enqueue":
+            if entry.get("operation") == "enqueue" and not _CLI_EVENT_RE.match(entry.get("content") or ""):
                 qtext = (entry.get("content") or "").strip()
                 seen = qtext in queued_user_texts
                 qtext, notifs = _split_notifications(qtext)
@@ -1971,10 +1981,10 @@ def _normalize(
             if err_text:
                 messages.append(api_error(err_text, entry.get("error")))
             continue
-        if message.get("stop_reason") == "stop_sequence":
+        if message.get("stop_reason") == "stop_sequence" and not entry.get("isVirtual"):
             continue
         role = message.get("role", etype)
-        content = message.get("content")
+        content = _host_content(entry)
         if role == "user":
             interrupt_text = content if isinstance(content, str) else _text_from_content(content)
             if _INTERRUPT_RE.match((interrupt_text or "").strip()):
@@ -2025,6 +2035,8 @@ def _normalize(
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
+                if bid in host_hidden:
+                    continue
                 if name == "AskUserQuestion" and isinstance(inp, dict):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)

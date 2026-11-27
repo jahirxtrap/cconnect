@@ -13,6 +13,8 @@ from core.config import COMMANDS, DEFAULT_CWD, ULTRACODE_EFFORT
 _CONFIG_FILES = ("settings.json", "settings.local.json", "plugins/installed_plugins.json")
 _CONFIG_FOLDERS = ("commands", "skills", "agents", "output-styles")
 _OWN_KEYS = ("models", "account", "fast_mode_state", "fast_mode_disabled_reason")
+_BUILTIN_KEYS = ("available_output_styles", "agents", "commands")
+_BUILTINS = "builtins"
 
 _snapshots: dict[str, tuple[tuple, dict[str, Any]]] = {}
 _reading: dict[str, asyncio.Task] = {}
@@ -100,7 +102,11 @@ async def _fetch(account: str, stamp: tuple, fresh: bool) -> dict[str, Any]:
     if isinstance(own, BaseException):
         logger.warning(f"CLI info of account {account} unavailable: {type(own).__name__}: {own}")
         return dict(shared)
-    return {**shared, **{key: own[key] for key in _OWN_KEYS if key in own}}
+    return {
+        **shared,
+        **{key: own[key] for key in _OWN_KEYS if key in own},
+        _BUILTINS: {key: own[key] for key in _BUILTIN_KEYS if key in own},
+    }
 
 
 def _unknown_windows(listed: list[dict]) -> list[str]:
@@ -195,6 +201,17 @@ async def server_info(refresh: bool = False, account: Optional[str] = None) -> d
     known = _snapshots.get(target)
     if refresh or known is None or known[0] != await asyncio.to_thread(_stamp):
         return await asyncio.shield(_reread(target))
+    return known[1]
+
+
+async def cached_info(account: Optional[str] = None) -> dict[str, Any]:
+    """The last snapshot without waiting on a stale one, which is read again in the background."""
+    target = _target(account)
+    known = _snapshots.get(target)
+    if known is None:
+        return await asyncio.shield(_reread(target))
+    if known[0] != await asyncio.to_thread(_stamp):
+        _reread(target)
     return known[1]
 
 
@@ -367,6 +384,21 @@ def fast_mode(info: dict[str, Any]) -> dict[str, Any]:
 def output_styles(info: dict[str, Any]) -> list[str]:
     styles = info.get("available_output_styles")
     return [style for style in styles if isinstance(style, str)] if isinstance(styles, list) else []
+
+
+def builtins(info: dict[str, Any]) -> dict[str, Any]:
+    """What the CLI reports with no setting sources: its own styles, commands and agents alone."""
+    own = info.get(_BUILTINS)
+    return own if isinstance(own, dict) else {}
+
+
+def builtin_commands(info: dict[str, Any]) -> list[dict]:
+    return [entry for entry in _cli_commands(info).values() if entry.get("builtin")]
+
+
+def agents(info: dict[str, Any]) -> list[dict]:
+    listed = info.get("agents")
+    return [a for a in listed if isinstance(a, dict) and isinstance(a.get("name"), str)] if isinstance(listed, list) else []
 
 
 def known_model(info: dict[str, Any], model: Optional[str]) -> bool:

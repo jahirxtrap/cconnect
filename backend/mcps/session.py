@@ -7,7 +7,8 @@ from mcps.components import CAPABILITY as COMPONENTS
 from mcps.definition import Definition, reply
 from services.live_sessions import RELOAD_COUNTS
 
-RELOAD_KINDS = ["plugins", "skills"]
+SESSION_KIND = "session"
+RELOAD_KINDS = ["plugins", "skills", SESSION_KIND]
 HISTORY_MATCHES = 10
 HISTORY_NEIGHBOURS = 5
 HISTORY_LATEST = 10
@@ -37,14 +38,16 @@ RELOAD = Definition(
     "reload",
     "Reload the plugins or the skills of this session right away, so the ones created, installed or edited"
     " during it can be used from this same turn; the user sees it in the chat. Use it after changing a"
-    " plugin or a skill in this session, or when the user asks you to reload.",
+    " plugin or a skill in this session, or when the user asks you to reload. What the CLI reads only when"
+    " it starts, such as hooks or the env of settings.json, needs kind session instead.",
     {
         "type": "object",
         "properties": {
             "kind": {
                 "type": "string",
                 "enum": RELOAD_KINDS,
-                "description": "plugins brings their commands, agents and MCP servers too; skills only the skills.",
+                "description": "plugins brings their commands, agents and MCP servers too; skills only the skills;"
+                " session restarts the CLI as soon as this turn ends and no background task runs.",
             },
         },
         "required": ["kind"],
@@ -239,6 +242,10 @@ def make_tools(context: dict) -> list:
             if kind not in RELOAD_KINDS:
                 return reply(f"kind is {' or '.join(RELOAD_KINDS)}.")
             report = await reload_session(kind)
+            if kind == SESSION_KIND:
+                if report and report.get("pending"):
+                    return reply("The CLI restarts as soon as this turn ends and no background task runs.")
+                return reply("The CLI could not be restarted." if report and report.get("failed") else "The CLI restarted.")
             if not report or not report.get("resident") or report.get("failed"):
                 return reply(f"The {kind} could not be reloaded.")
             counts = ", ".join(f"{report[name]} {name.replace('_', ' ')}" for name in RELOAD_COUNTS if name in report)

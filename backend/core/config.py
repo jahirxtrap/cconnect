@@ -67,6 +67,7 @@ COMMANDS = [
      "kind": "session_info", "own_description": True},
     {"name": "reload-plugins", "description": "Reload plugins", "kind": "reload"},
     {"name": "reload-skills", "description": "Reload skills", "kind": "reload"},
+    {"name": "reload-session", "description": "Restart this chat's Claude process to apply hooks and settings", "kind": "reload"},
 ]
 
 

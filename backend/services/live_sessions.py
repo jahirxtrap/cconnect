@@ -35,6 +35,8 @@ STOP_GRACE = 15.0
 
 PLUGIN_RELOAD = "reload-plugins"
 
+SESSION_RELOAD = "reload-session"
+
 RELOADS = {PLUGIN_RELOAD: "reload_plugins", "reload-skills": "reload_skills"}
 
 RELOAD_COUNTS = {"plugins": "plugins", "commands": "commands", "agents": "agents", "mcp_servers": "mcpServers"}
@@ -105,6 +107,7 @@ class LiveSession:
         self._shell_stop = None
         self._resident = None
         self.adopter = None
+        self.warmer = None
         self.resumer = None
         self._cooldown = None
         self._ending = False
@@ -414,7 +417,36 @@ class LiveSession:
         if self.resident_alive and await self._resident.tell(notification) and not self.running and self.adopter is not None:
             await self.adopter()
 
+    async def restart(self):
+        if not self.resident_alive:
+            report = {"command": SESSION_RELOAD, "resident": False}
+        elif self.running or self.tasks_alive:
+            self._resident.restart_pending = True
+            report = {"command": SESSION_RELOAD, "resident": True, "pending": True}
+        else:
+            return await self._restart_now()
+        await self._emit({"type": "reloaded", **report})
+        return report
+
+    async def _restart_now(self):
+        await self._resident.close("restart requested")
+        try:
+            if self.warmer is not None:
+                await self.warmer()
+            report = {"command": SESSION_RELOAD, "resident": True}
+        except Exception:
+            report = {"command": SESSION_RELOAD, "resident": True, "failed": True}
+        await self._emit({"type": "reloaded", **report})
+        return report
+
+    def _restart_when_due(self):
+        if self.resident_alive and self._resident.restart_pending and not self.running and not self.tasks_alive:
+            self._resident.restart_pending = False
+            asyncio.get_running_loop().create_task(self._restart_now())
+
     async def reload(self, command, hold=False):
+        if command == SESSION_RELOAD:
+            return await self.restart()
         subtype = RELOADS.get(command)
         if subtype is None:
             return None
@@ -663,6 +695,7 @@ class LiveSession:
         if kind == "agent_result":
             self._background.pop(event.get("id"), None)
             self._schedule_cooldown()
+            self._restart_when_due()
             return
         if kind in ("done", "interrupted") and not self.resident_alive:
             self._end_background()
@@ -1162,6 +1195,8 @@ class LiveSession:
                 self._schedule_cooldown()
             if resume is not None:
                 asyncio.create_task(resume())
+            else:
+                self._restart_when_due()
 
 
 class SessionRegistry:

@@ -253,6 +253,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
         return False
     session.turn_start_index = turn_start
     session.adopter = lambda: _adopt_turn(session, prefs, capabilities)
+    session.warmer = lambda: _warm_resident(session, capabilities)
     if mid:
         await session.commit_user(mid, text)
     return True
@@ -264,6 +265,34 @@ async def _resume_queue(session, prefs=None, capabilities=None):
     item = await session.take_queued()
     if item is not None and not await _start_turn(session, item["id"], item["text"], item.get("attachments"), prefs, capabilities):
         await session.enqueue(item["id"], item["text"], item.get("attachments"), again=True)
+
+
+async def _warm_resident(session, capabilities=None):
+    """Start the chat's standing CLI again with the settings of its turns, without sending a prompt."""
+    state: _Session = session.state
+    resident = await session.resident()
+    if resident is None:
+        return
+    async for _ in run_prompt(
+        resident=resident,
+        warm=True,
+        tasks_alive=session.tasks_alive,
+        channel=session.channel,
+        unlocked=lambda: session.unlocked,
+        prompt="",
+        cwd=state.cwd,
+        permission_mode=state.permission_mode,
+        resume=state.session_id,
+        model=_resolve_model(state.model),
+        account=accounts.resolve(state.account),
+        effort=state.effort,
+        partial=state.partial,
+        reload=lambda kind: session.reload(f"reload-{kind}"),
+        capabilities=capabilities,
+        locale=state.locale,
+        session_info=lambda: _session_info(state),
+    ):
+        pass
 
 
 async def _adopt_turn(session, prefs=None, capabilities=None):

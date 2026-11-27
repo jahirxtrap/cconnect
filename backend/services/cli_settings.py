@@ -23,6 +23,7 @@ _ERROR_REPORTING_VAR = "DISABLE_ERROR_REPORTING"
 _SWITCHED_ON = ("1", "true", "yes", "on")
 _LEVEL_VARS = {"no_telemetry": _TELEMETRY_VAR, "essential": _ESSENTIAL_VAR}
 _TODO_TOOLS_VAR = "CLAUDE_CODE_ENABLE_TODO_TOOLS"
+CODE_MODE_VAR = "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE"
 _AGENTS_MD_OPTION = "pluginConfigs.cc-plugin-agents-md@builtin.options.instructionFiles"
 _INSTRUCTION_FILES = ("claude-md-or-agents-md", "claude-md-and-agents-md", "claude-md", "managed-only")
 _DEFAULT_STYLE = "default"
@@ -127,6 +128,7 @@ def _switch(name: str) -> tuple[Callable[[dict], bool], Callable[[dict, Optional
 
 
 _TODO_TOOLS_READ, _TODO_TOOLS_WRITE = _switch(_TODO_TOOLS_VAR)
+_CODE_MODE_READ, _CODE_MODE_WRITE = _switch(CODE_MODE_VAR)
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -160,6 +162,15 @@ SETTINGS: dict[str, CliSettingDef] = {
         unset_by=False,
         read=_TODO_TOOLS_READ,
         write=_TODO_TOOLS_WRITE,
+    ),
+    "code_mode": CliSettingDef(
+        json_key=f"{_ENV}.{CODE_MODE_VAR}",
+        default=False,
+        type=bool,
+        description="Claude writes JavaScript that calls its tools, MCP ones included, instead of calling them one by one",
+        unset_by=False,
+        read=_CODE_MODE_READ,
+        write=_CODE_MODE_WRITE,
     ),
     "chat_language": CliSettingDef(
         json_key="language",

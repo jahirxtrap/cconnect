@@ -36,6 +36,8 @@ class PersistentSession:
     def __init__(self, shape: dict):
         self.shape = shape
         self.mark: Optional[dict] = None
+        self.restart_pending = False
+        self.connecting = asyncio.Lock()
         self.client: Any = None
         self.inbox: Optional[asyncio.Queue] = None
         self.turn: Optional[TurnBinding] = None
@@ -247,6 +249,7 @@ class PersistentSession:
     async def close(self, reason: str) -> None:
         self.turn = None
         self.mark = None
+        self.restart_pending = False
         owner = self._owner
         self._owner = None
         self.client = None

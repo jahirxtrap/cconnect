@@ -16,6 +16,7 @@
     outputStyle: string;
     streaming: boolean;
     todoTools: boolean;
+    codeMode: boolean;
     chatLanguage: string;
     alwaysThinking: boolean;
     autoCompact: boolean;
@@ -31,6 +32,7 @@
       outputStyle: string;
       streaming: boolean;
       todoTools: boolean;
+      codeMode: boolean;
       chatLanguage: string;
       alwaysThinking: boolean;
       autoCompact: boolean;
@@ -49,6 +51,7 @@
     outputStyle,
     streaming,
     todoTools,
+    codeMode,
     chatLanguage,
     alwaysThinking,
     autoCompact,
@@ -73,6 +76,7 @@
   let selectedStyle = $state(untrack(() => outputStyle));
   let streamTokens = $state(untrack(() => streaming));
   let taskTools = $state(untrack(() => todoTools));
+  let scriptTools = $state(untrack(() => codeMode));
   let language = $state(untrack(() => chatLanguage));
   let thinkAlways = $state(untrack(() => alwaysThinking));
   let compactAuto = $state(untrack(() => autoCompact));
@@ -127,6 +131,7 @@
           outputStyle: selectedStyle,
           streaming: streamTokens,
           todoTools: taskTools,
+          codeMode: scriptTools,
           chatLanguage: language.trim(),
           alwaysThinking: thinkAlways,
           autoCompact: compactAuto,
@@ -214,6 +219,13 @@
       summary={t("TASK_TOOLS_DESC")}
       checked={taskTools}
       onChange={(value) => (taskTools = value)}
+    />
+    <SwitchRow
+      class="-mt-2"
+      title={t("CODE_MODE")}
+      summary={t("CODE_MODE_DESC")}
+      checked={scriptTools}
+      onChange={(value) => (scriptTools = value)}
     />
     <SwitchRow
       class="-mt-2"

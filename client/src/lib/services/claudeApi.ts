@@ -124,6 +124,55 @@ export interface CatalogPlugin {
   installed: boolean;
 }
 
+export const CUSTOM_KINDS = ["styles", "commands", "agents"] as const;
+
+export type CustomKind = (typeof CUSTOM_KINDS)[number];
+
+export const CUSTOM_SCOPES = ["user", "project"] as const;
+
+export type CustomScope = (typeof CUSTOM_SCOPES)[number];
+
+export const CUSTOM_BUILTIN = "builtin";
+
+export const CUSTOM_PLUGIN = "plugin";
+
+export interface Customization {
+  name: string;
+  description: string | null;
+  source: string;
+  plugin: string | null;
+  pluginName: string | null;
+  file: string | null;
+  path: string | null;
+  keepCodingInstructions: boolean | null;
+  model: string | null;
+  argumentHint: string | null;
+  body: string | null;
+}
+
+export interface Customizations {
+  styles: Customization[];
+  commands: Customization[];
+  agents: Customization[];
+  folders: Record<CustomKind, Record<CustomScope, string | null>>;
+  project: string | null;
+}
+
+export interface CustomizationDraft {
+  scope: CustomScope;
+  file: string | null;
+  name: string;
+  description: string;
+  keepCodingInstructions: boolean;
+  body: string;
+}
+
+export interface CustomizationSaved {
+  ok: boolean;
+  error: string | null;
+  file: string | null;
+}
+
 export interface Memory {
   scope: string;
   name: string;
@@ -522,6 +571,56 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         version: item.version ?? null,
         installed: item.installed === true,
       }));
+  },
+
+  async customizations(cwd: string | null = null): Promise<Customizations | null> {
+    const data = await client.get<Wire>("/claude/customizations", cwd ? { cwd } : undefined);
+    if (!data) return null;
+    const parse = (kind: CustomKind): Customization[] =>
+      (Array.isArray(data[kind]) ? data[kind] : [])
+        .filter((item: Wire) => item.name && item.source)
+        .map((item: Wire) => ({
+          name: item.name,
+          description: item.description ?? null,
+          source: item.source,
+          plugin: item.plugin ?? null,
+          pluginName: item.plugin_name ?? null,
+          file: item.file ?? null,
+          path: item.path ?? null,
+          keepCodingInstructions: typeof item.keep_coding_instructions === "boolean" ? item.keep_coding_instructions : null,
+          model: item.model ?? null,
+          argumentHint: item.argument_hint ?? null,
+          body: item.body ?? null,
+        }));
+    const folders = (kind: CustomKind) =>
+      Object.fromEntries(CUSTOM_SCOPES.map((scope) => [scope, data.folders?.[kind]?.[scope] ?? null])) as Record<
+        CustomScope,
+        string | null
+      >;
+    return {
+      styles: parse("styles"),
+      commands: parse("commands"),
+      agents: parse("agents"),
+      folders: Object.fromEntries(CUSTOM_KINDS.map((kind) => [kind, folders(kind)])) as Customizations["folders"],
+      project: data.project ?? null,
+    };
+  },
+
+  async saveCustomization(kind: CustomKind, draft: CustomizationDraft, cwd: string | null): Promise<CustomizationSaved> {
+    const data = await client.put<Wire>(`/claude/customizations/${kind}`, {
+      scope: draft.scope,
+      cwd,
+      file: draft.file,
+      name: draft.name,
+      description: draft.description,
+      keep_coding_instructions: draft.keepCodingInstructions,
+      body: draft.body,
+    });
+    return { ok: data?.ok === true, error: data?.error ?? null, file: data?.file ?? null };
+  },
+
+  async deleteCustomization(kind: CustomKind, scope: CustomScope, file: string, cwd: string | null): Promise<boolean> {
+    return (await client.delete(`/claude/customizations/${kind}`, { scope, file, ...(cwd ? { cwd } : {}) })) !== null;
   },
 
   async memories(project: string | null): Promise<Memories | null> {

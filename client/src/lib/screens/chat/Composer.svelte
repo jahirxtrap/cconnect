@@ -125,6 +125,7 @@
   }: Props = $props();
 
   let fieldScroll = $state(0);
+  let fieldFocused = $state(false);
 
   const ACTION_CLASS = `${ROUND_BUTTON_CLASS} bg-surface-variant text-on-surface-variant hover:text-on-surface`;
   const FIELD_TEXT = isTouch ? "text-body-lg" : "text-body-md leading-(--chat-line-body)";
@@ -593,8 +594,8 @@
 {/snippet}
 
 {#snippet entryList()}
-  {#if entries.length}
-    <div class="absolute inset-x-0 bottom-full z-40 mb-1.5 max-h-64 {MENU_LIST_CLASS}">
+  {#if entries.length && fieldFocused}
+    <div use:keepFocus class="absolute inset-x-0 bottom-full z-40 mb-1.5 max-h-64 {MENU_LIST_CLASS}">
       <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>
         {#each entries as entry (entry.command ? `/${entry.command.name}` : entry.row ? `+${entry.row.text}` : `${SHELL_MARK}${entry.shell}`)}
           <button
@@ -706,6 +707,14 @@
             {onkeydown}
             {onpaste}
             {ondragenter}
+            onfocus={() => {
+              fieldFocused = true;
+              if (dismissed) reopen();
+            }}
+            onpointerdown={() => {
+              if (dismissed) reopen();
+            }}
+            onblur={() => (fieldFocused = false)}
             onscroll={(event) => (fieldScroll = event.currentTarget.scrollTop)}
             rows="1"
             placeholder={listening ? t("VOICE_LISTENING") : (ghost ?? t("TYPE_MESSAGE"))}

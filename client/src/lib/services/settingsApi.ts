@@ -8,6 +8,7 @@ export interface SettingsSnapshot {
   permissionMode: string;
   streaming: boolean;
   todoTools: boolean;
+  codeMode: boolean;
   browserView: boolean;
   suggestions: boolean;
   drawings: boolean;
@@ -60,6 +61,7 @@ export interface SettingsPatch {
   permission_mode?: string;
   streaming?: boolean;
   todo_tools?: boolean;
+  code_mode?: boolean;
   browser_view?: boolean;
   suggestions?: boolean;
   drawings?: boolean;
@@ -153,6 +155,7 @@ export const parseSettings = (wire: SettingsWire): SettingsSnapshot => ({
   permissionMode: effectiveStr(wire, "permission_mode", "bypassPermissions"),
   streaming: effectiveBool(wire, "streaming", true),
   todoTools: effectiveBool(wire, "todo_tools", false),
+  codeMode: effectiveBool(wire, "code_mode", false),
   browserView: effectiveBool(wire, "browser_view", false),
   suggestions: effectiveBool(wire, "suggestions", true),
   drawings: effectiveBool(wire, "drawings", false),

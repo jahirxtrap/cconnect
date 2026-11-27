@@ -1,4 +1,4 @@
-"""Claude Code management: user prompt, plugins, marketplaces, skills, hooks, MCP and memories."""
+"""Claude Code management: prompts, plugins, marketplaces, skills, hooks, MCP, styles, memories."""
 
 import asyncio
 from pathlib import Path
@@ -11,7 +11,7 @@ from core.responses import api_response, derived_response, fixed_response
 from schemas.accounts import ProviderAuth
 from services import accounts, asset_icons, claude_assets, claude_manage, cli_login, plugin_secrets, plugin_updates
 from core.config import DEFAULT_CWD
-from services import claude_status, mcp_skills
+from services import claude_custom, claude_status, mcp_skills
 from services import usage as usage_service
 
 router = APIRouter(tags=["Claude"])
@@ -97,6 +97,16 @@ class McpCallbackBody(BaseModel):
     name: str
     account: str
     url: str
+
+
+class CustomizationBody(BaseModel):
+    scope: str
+    cwd: str | None = None
+    file: str | None = None
+    name: str
+    description: str = ""
+    keep_coding_instructions: bool = False
+    body: str = ""
 
 
 @router.get("/claude/prompts")
@@ -340,6 +350,33 @@ async def sign_out_mcp(body: McpLoginBody):
 @router.delete("/claude/mcp/{name}")
 def remove_mcp(name: str):
     return api_response(data=claude_manage.mcp_remove(name))
+
+
+@router.get("/claude/customizations")
+async def get_customizations(cwd: str | None = None):
+    return api_response(data=await claude_custom.listing(cwd))
+
+
+@router.put("/claude/customizations/{kind}")
+def save_customization(kind: str, body: CustomizationBody):
+    try:
+        saved = claude_custom.save(
+            kind, body.scope, body.cwd, body.file, body.name, body.description, body.keep_coding_instructions, body.body
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return api_response(data=saved)
+
+
+@router.delete("/claude/customizations/{kind}")
+def delete_customization(kind: str, scope: str, file: str, cwd: str | None = None):
+    try:
+        deleted = claude_custom.delete(kind, scope, cwd, file)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not deleted:
+        raise HTTPException(status_code=404, detail="file not found")
+    return api_response()
 
 
 @router.get("/claude/memories")

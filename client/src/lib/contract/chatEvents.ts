@@ -506,6 +506,7 @@ export interface Reloaded {
   mcp_servers?: number | null;
   errors?: number | null;
   held?: boolean | null;
+  pending?: boolean | null;
 }
 export interface Agent {
   seq?: number | null;

@@ -354,6 +354,7 @@ class Reloaded(Event):
     mcp_servers: Optional[int] = None
     errors: Optional[int] = None
     held: Optional[bool] = None
+    pending: Optional[bool] = None
 
 
 class Agent(Event):

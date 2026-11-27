@@ -9,10 +9,10 @@
   import ClaudeCliSection from "$lib/screens/claude/ClaudeCliSection.svelte";
   import ClaudeUsageSection from "$lib/screens/claude/ClaudeUsageSection.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
-  import Pressable from "$lib/ui/Pressable.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
-  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
+  import SideNav from "$lib/ui/SideNav.svelte";
+  import SideNavItem from "$lib/ui/SideNavItem.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import AboutGroup from "./AboutGroup.svelte";
   import BackgroundSection from "./BackgroundSection.svelte";
@@ -91,28 +91,16 @@
     {/snippet}
   </AppTopBar>
   <div class="flex min-h-0 flex-1 pl-(--page-inset)">
-    <div class="flex min-h-0 w-52 shrink-0 flex-col pb-(--page-inset)">
-      <nav class="flex max-h-full min-h-0 flex-col overflow-hidden rounded-panel bg-card">
-        <div
-          use:viewportScrollbar
-          class="scrollbar-thin rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
-        >
-          {#each SETTINGS_SECTIONS as item (item.id)}
-            {@const current = section === item.id && !page.searching}
-            <Pressable
-              onclick={() => select(item.id)}
-              hover={!current}
-              class="flex h-8 w-full shrink-0 items-center gap-2 rounded-md px-2.5 text-body-md {current
-                ? 'bg-surface-variant text-on-surface'
-                : 'text-on-surface-variant'}"
-            >
-              <item.icon size={16} class="shrink-0 {current ? 'text-accent' : ''}" />
-              <span class="min-w-0 flex-1 truncate text-left">{t(item.label)}</span>
-            </Pressable>
-          {/each}
-        </div>
-      </nav>
-    </div>
+    <SideNav>
+      {#each SETTINGS_SECTIONS as item (item.id)}
+        <SideNavItem
+          label={t(item.label)}
+          icon={item.icon}
+          current={section === item.id && !page.searching}
+          onclick={() => select(item.id)}
+        />
+      {/each}
+    </SideNav>
 
     <div class="flex min-w-0 flex-1 flex-col">
       <PullToRefresh
