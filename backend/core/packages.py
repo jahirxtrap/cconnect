@@ -43,6 +43,14 @@ def in_place_upgrade_command(distribution: str) -> list[str]:
     return [uv, "tool", "upgrade", distribution] if uv else _pip_upgrade(distribution)
 
 
+def repair_command(distribution: str, version: str) -> list[str]:
+    requirement = f"{distribution}=={version}"
+    uv = uv_tool()
+    if uv:
+        return [uv, "pip", "install", "--python", sys.executable, requirement]
+    return [sys.executable, "-m", "pip", "install", requirement]
+
+
 def _pip_upgrade(distribution: str) -> list[str]:
     return [sys.executable, "-m", "pip", "install", "--upgrade", distribution]
 

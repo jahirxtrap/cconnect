@@ -1,5 +1,3 @@
-"""The skills MCP servers serve through the io.modelcontextprotocol/skills extension."""
-
 import asyncio
 import base64
 import json
@@ -136,7 +134,6 @@ def _text(result: Any) -> str:
 
 
 async def read(server_name: str, uri: str, cwd: str) -> Optional[str]:
-    """A skill file's text, read from the server that lists it; None for a file it does not serve."""
     found = next(((server, skills) for server, skills in await _skills_by_server(cwd, False) if server.name == server_name), None)
     if found is None or not _serves(found[1], uri):
         return None

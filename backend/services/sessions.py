@@ -1205,7 +1205,6 @@ def _reply_id(entry: dict) -> Optional[str]:
 
 
 def _host_content(entry: dict) -> Any:
-    """What a host shows of an entry: a call a Code Mode script made carries it in ``hostContent``."""
     message = entry.get("message") if isinstance(entry.get("message"), dict) else {}
     return entry.get("hostContent") if entry.get("isVirtual") and entry.get("hostContent") else message.get("content")
 

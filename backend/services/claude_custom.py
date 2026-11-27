@@ -1,5 +1,3 @@
-"""Output styles, slash commands and subagents: Claude Code's Markdown files and its built-ins."""
-
 import asyncio
 import os
 from pathlib import Path

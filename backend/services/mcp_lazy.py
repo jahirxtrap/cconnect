@@ -278,7 +278,6 @@ async def _modern(spec: Spec, env: dict[str, str], cwd: str) -> AsyncIterator[Cl
 
 
 async def skills_listed(client: Client) -> Optional[list[Any]]:
-    """The skills a server lists: [] when it declares the extension and lists none, None without it."""
     if _SKILLS_EXTENSION not in (client.server_capabilities.extensions or {}):
         return None
     with suppress(MCPError):
@@ -302,7 +301,6 @@ def _local(cwd: str) -> tuple[list[Spec], dict[str, str]]:
 
 
 async def local_skills(cwd: str) -> dict[str, list[Any]]:
-    """Each local server's skills from its catalog; a server without one is read in the background."""
     specs, base = await asyncio.to_thread(_local, cwd)
     found = {}
     for spec in specs:

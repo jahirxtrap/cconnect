@@ -59,6 +59,14 @@ def on_disk() -> str:
         return release.VERSION
 
 
+def _repair(version: str) -> str:
+    try:
+        result = packages.run(packages.repair_command(DISTRIBUTION, version), _UPGRADE_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return str(exc)
+    return (result.stdout + result.stderr).strip()
+
+
 def upgrade_in_place() -> dict:
     """Upgrades the install under its running python and puts back the database drivers uv prunes."""
     kept = _kept_packages()
@@ -68,6 +76,8 @@ def upgrade_in_place() -> dict:
     except (OSError, subprocess.SubprocessError) as exc:
         return {**_package_status(), "ok": False, "message": str(exc), "changed": False, "version": before}
     output = (result.stdout + result.stderr).strip()
+    if result.returncode != 0:
+        output = f"{output}\n{_repair(on_disk())}".strip()
     try:
         database_engines.install_packages(kept)
     except database_engines.EngineError as exc:

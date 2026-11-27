@@ -859,7 +859,6 @@ class CliControls:
 
 
 async def _connect_resident(resident, options) -> None:
-    """Start the standing CLI when it is not running, once even when a warm start and a turn both ask."""
     async with resident.connecting:
         if resident.connected:
             return

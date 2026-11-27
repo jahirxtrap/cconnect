@@ -268,7 +268,6 @@ async def _resume_queue(session, prefs=None, capabilities=None):
 
 
 async def _warm_resident(session, capabilities=None):
-    """Start the chat's standing CLI again with the settings of its turns, without sending a prompt."""
     state: _Session = session.state
     resident = await session.resident()
     if resident is None:

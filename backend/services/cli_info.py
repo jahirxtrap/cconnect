@@ -205,7 +205,6 @@ async def server_info(refresh: bool = False, account: Optional[str] = None) -> d
 
 
 async def cached_info(account: Optional[str] = None) -> dict[str, Any]:
-    """The last snapshot without waiting on a stale one, which is read again in the background."""
     target = _target(account)
     known = _snapshots.get(target)
     if known is None:
@@ -387,7 +386,6 @@ def output_styles(info: dict[str, Any]) -> list[str]:
 
 
 def builtins(info: dict[str, Any]) -> dict[str, Any]:
-    """What the CLI reports with no setting sources: its own styles, commands and agents alone."""
     own = info.get(_BUILTINS)
     return own if isinstance(own, dict) else {}
 
