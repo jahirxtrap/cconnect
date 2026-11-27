@@ -3,6 +3,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { sessionLabel, type SessionInfo } from "$lib/data/models";
+  import { settings } from "$lib/data/settings.svelte";
   import { rankLabel } from "$lib/data/textMatch";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -108,7 +109,7 @@
         })}
       onDelete={() => edits.remove(session)}
       trash={chat.trashEnabled}
-      onMove={(preset) => (edits.moving = { session, preset })}
+      onMove={settings.lockedProject ? null : (preset) => (edits.moving = { session, preset })}
       categories={chat.categoriesFor(session.projectKey)}
       currentCategoryId={chat.placement[session.sessionId]?.categoryId ?? null}
       onPlace={(categoryId) => void chat.placeSession(session.sessionId, categoryId)}

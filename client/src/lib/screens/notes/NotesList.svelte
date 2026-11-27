@@ -84,7 +84,7 @@
   <div class="flex max-h-full min-h-0 flex-col self-start overflow-hidden rounded-panel bg-card">
     <div
       use:viewportScrollbar
-      class="rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
+      class="scrollbar-thin rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
     >
       {#each listed as note (note.id)}
         {@render row(note)}

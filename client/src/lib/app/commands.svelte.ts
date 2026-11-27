@@ -3,6 +3,7 @@ import { navigation } from "$lib/app/navigation.svelte";
 import { NAV_SCREENS } from "$lib/app/screens";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { projectLabel, projectNameOf, type SessionInfo } from "$lib/data/models";
+import { settings } from "$lib/data/settings.svelte";
 import { rankLabel } from "$lib/data/textMatch";
 import { t } from "$lib/i18n/index.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
@@ -31,6 +32,8 @@ export const collectCommands = (): Command[] => {
   const scopes = scope === "global" ? ["global" as const] : [scope, "global" as const];
   const list = chatListFor(backend.active);
   const projects = list?.projects ?? [];
+  const locked = settings.lockedProject;
+  const inScope = (projectKey: string | null | undefined) => !locked || projectKey === locked;
 
   const actions: Command[] = shortcuts.available(scopes).map((shortcut) => ({
     id: `action:${shortcut.id}`,
@@ -48,7 +51,7 @@ export const collectCommands = (): Command[] => {
     run: screen.open,
   }));
 
-  const settings: Command[] = SETTINGS_SECTIONS.filter((section) => section.id !== "claude").map((section) => ({
+  const sections: Command[] = SETTINGS_SECTIONS.filter((section) => section.id !== "claude").map((section) => ({
     id: `settings:${section.id}`,
     group: "settings",
     label: t(section.label),
@@ -56,7 +59,7 @@ export const collectCommands = (): Command[] => {
     run: () => navigation.openSettings(section.id === "general" ? null : section.id),
   }));
 
-  const chats: Command[] = (list?.sessions ?? []).map((session) => ({
+  const chats: Command[] = (list?.sessions ?? []).filter((session) => inScope(session.projectKey)).map((session) => ({
     id: `chat:${session.sessionId}`,
     group: "chat",
     label: sessionLabel(session),
@@ -69,7 +72,7 @@ export const collectCommands = (): Command[] => {
     },
   }));
 
-  const projectCommands: Command[] = projects.map((project) => ({
+  const projectCommands: Command[] = projects.filter((project) => inScope(project.projectKey)).map((project) => ({
     id: `project:${project.projectKey}`,
     group: "project",
     label: projectLabel(project),
@@ -77,7 +80,7 @@ export const collectCommands = (): Command[] => {
     run: () => panes.focusedChat.selectHistoryProject(project.projectKey),
   }));
 
-  return [...actions, ...screens, ...chats, ...projectCommands, ...settings];
+  return [...actions, ...screens, ...chats, ...projectCommands, ...sections];
 };
 
 export const filterCommands = (commands: Command[], query: string): Command[] => {

@@ -2,6 +2,7 @@
   import Eraser from "@lucide/svelte/icons/eraser";
   import { untrack } from "svelte";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
+  import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -44,7 +45,7 @@
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={() => onSave(project, text)}>{t("SAVE")}</Button>
   {/snippet}
-  <SelectField label={t("PROJECT")} selected={project} {options} onSelect={choose} />
+  <SelectField label={t("PROJECT")} selected={project} {options} enabled={!settings.lockedProject} onSelect={choose} />
   <p class="mt-2.5 text-body-sm text-on-surface-variant">{t("PROJECT_PROMPT_SUMMARY")}</p>
   <div class="mt-2.5">
     <InputField value={text} oninput={(value) => (text = value)} minLines={MIN_LINES} />

@@ -50,7 +50,7 @@
 
   const openProjectPrompt = () => {
     if (!projects.length) return;
-    projectPromptFor = chat.defaultProjectKey(projects) ?? chat.projectKey ?? chat.withDefaultProject(projects)[0].projectKey;
+    projectPromptFor = chat.contextProject ?? chat.withDefaultProject(projects)[0].projectKey;
   };
 
   useSettingsDialog("claude", (target) => {

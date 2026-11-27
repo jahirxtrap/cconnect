@@ -266,9 +266,8 @@ export const marketplacesValue = (): string =>
 
 export const memoriesValue = (): string => {
   const chat = tabs.state;
-  const projects = chatListFor(backend.active)?.projects ?? [];
-  const project = chat.defaultProjectKey(projects) ?? chat.projectKey;
-  return project ? projectNameOf(projects, project, chat.cwd) : "";
+  const project = chat.contextProject;
+  return project ? projectNameOf(chat.historyProjects, project, chat.cwd) : "";
 };
 
 export const serviceStatusValue = (): string => {

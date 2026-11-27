@@ -105,7 +105,7 @@
     })),
   );
 
-  const styleOptions = $derived(capabilities.outputStyles.map((value) => ({ value, label: value })));
+  const styleOptions = $derived([...new Set([...capabilities.outputStyles, outputStyle])].map((value) => ({ value, label: value })));
 
   const levels = $derived(effortLevelsFor(capabilities, selectedModel));
   const description = $derived(capabilities.models.find((item) => item.id === selectedModel)?.description ?? "");

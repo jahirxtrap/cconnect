@@ -22,6 +22,10 @@ _DO_NOT_TRACK_VAR = "DO_NOT_TRACK"
 _ERROR_REPORTING_VAR = "DISABLE_ERROR_REPORTING"
 _SWITCHED_ON = ("1", "true", "yes", "on")
 _LEVEL_VARS = {"no_telemetry": _TELEMETRY_VAR, "essential": _ESSENTIAL_VAR}
+_TODO_TOOLS_VAR = "CLAUDE_CODE_ENABLE_TODO_TOOLS"
+_AGENTS_MD_OPTION = "pluginConfigs.cc-plugin-agents-md@builtin.options.instructionFiles"
+_INSTRUCTION_FILES = ("claude-md-or-agents-md", "claude-md-and-agents-md", "claude-md", "managed-only")
+_DEFAULT_STYLE = "default"
 
 DATA_SHARING_LEVELS = ("full", "no_telemetry", "essential")
 MAX_SAFE_INTEGER = 9007199254740991
@@ -109,6 +113,22 @@ def _inherited_reports() -> Optional[bool]:
     return False if os.environ.get(_ERROR_REPORTING_VAR) else None
 
 
+def _switch(name: str) -> tuple[Callable[[dict], bool], Callable[[dict, Optional[bool]], None]]:
+    def read(data: dict) -> bool:
+        return str(_env_of(data).get(name) or "").strip().lower() in _SWITCHED_ON
+
+    def write(data: dict, enabled: Optional[bool]) -> None:
+        if enabled:
+            assign(data, f"{_ENV}.{name}", "1")
+        else:
+            discard(data, f"{_ENV}.{name}")
+
+    return read, write
+
+
+_TODO_TOOLS_READ, _TODO_TOOLS_WRITE = _switch(_TODO_TOOLS_VAR)
+
+
 SETTINGS: dict[str, CliSettingDef] = {
     "retention_days": CliSettingDef(
         json_key="cleanupPeriodDays",
@@ -117,6 +137,29 @@ SETTINGS: dict[str, CliSettingDef] = {
         description="Days a chat is kept before the CLI deletes its transcript",
         minimum=1,
         maximum=MAX_SAFE_INTEGER,
+    ),
+    "output_style": CliSettingDef(
+        json_key="outputStyle",
+        default=_DEFAULT_STYLE,
+        type=str,
+        description="Voice Claude answers in, from the styles the CLI reports",
+        unset_by=_DEFAULT_STYLE,
+    ),
+    "instruction_files": CliSettingDef(
+        json_key=_AGENTS_MD_OPTION,
+        default="",
+        type=str,
+        description="Which project instructions Claude reads: CLAUDE.md, AGENTS.md or both; empty follows the CLI's own choice",
+        choices=_INSTRUCTION_FILES,
+    ),
+    "todo_tools": CliSettingDef(
+        json_key=f"{_ENV}.{_TODO_TOOLS_VAR}",
+        default=False,
+        type=bool,
+        description="Expose the task-tracking tools, which recent models otherwise omit to save context",
+        unset_by=False,
+        read=_TODO_TOOLS_READ,
+        write=_TODO_TOOLS_WRITE,
     ),
     "chat_language": CliSettingDef(
         json_key="language",

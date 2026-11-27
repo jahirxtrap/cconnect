@@ -20,7 +20,7 @@ from mcps import databases as database_tools
 from mcps.media import block_types, single_media
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, control_requests, delegates, device_tools, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, plugin_secrets, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, cli_settings, control_requests, delegates, device_tools, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, plugin_secrets, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -30,7 +30,7 @@ _SHARE_RULE = f"{_MCP_PREFIX}cconnect__{SHARE_TOOL}"
 _PACKS_RULE = f"{_MCP_PREFIX}cconnect__{PACKS_TOOL}"
 
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
-_AGENTS_MD_PLUGIN = "cc-plugin-agents-md@builtin"
+_RESTARTING_CLI_SETTINGS = ("output_style", "instruction_files", "todo_tools")
 _OUTPUT_SHARE = 4
 _MIN_OUTPUT_TOKENS = 1024
 CHANNEL_ENV = "CCONNECT_CHANNEL"
@@ -200,9 +200,6 @@ def _cli_settings(scope: dict) -> dict[str, Any]:
     overrides: dict[str, Any] = {"permissions": {"deny": deny}}
     if not scope["memory"]:
         overrides["autoMemoryEnabled"] = False
-    instructions = settings_store.get("instruction_files")
-    if instructions and scope["project_files"]:
-        overrides["pluginConfigs"] = {_AGENTS_MD_PLUGIN: {"options": {"instructionFiles": instructions}}}
     return overrides
 
 
@@ -1022,8 +1019,6 @@ async def run_prompt(
         session_env[CHANNEL_ENV] = channel
     if scope["search"]:
         session_env["ENABLE_TOOL_SEARCH"] = "true"
-    if settings_store.get("todo_tools"):
-        session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if settings_store.get("browser_view"):
         from services import browser
         attach = await browser.ready_endpoint()
@@ -1035,9 +1030,6 @@ async def run_prompt(
     overrides = _cli_settings(scope)
     if ultracode:
         overrides["ultracode"] = True
-    style = settings_store.get("output_style")
-    if style:
-        overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
     hooks_map: dict[str, Any] = {
         "PreToolUse": [HookMatcher(matcher=None, hooks=[_background_guard(resident is not None), _secrets_guard(unlocked), _block_stale_shared], on_failure="block")]
@@ -1066,8 +1058,7 @@ async def run_prompt(
             "permission_mode": permission_mode,
             "partial": partial,
             "scope": scope["id"],
-            "style": overrides.get("outputStyle"),
-            "instructions": overrides.get("pluginConfigs"),
+            **{key: cli_settings.get(key) for key in _RESTARTING_CLI_SETTINGS},
             "mods": mods.enabled(),
             "capabilities": sorted(capabilities or ()),
         }

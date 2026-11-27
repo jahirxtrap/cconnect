@@ -467,6 +467,12 @@ export class ChatState {
     return this.withDefaultProject([...visible, ...kept]);
   });
   readonly historyPath = $derived(this.#projectPath(this.historyProject));
+  readonly contextProject = $derived.by(() => {
+    if (settings.lockedProject) return settings.lockedProject;
+    const listed = this.historyProjects.map((item) => item.projectKey);
+    const candidates = [this.historyProject, this.workingProject, this.defaultProjectKey(this.historyProjects), this.projectKey];
+    return candidates.find((key) => key !== null && listed.includes(key)) ?? listed[0] ?? null;
+  });
 
   readonly allProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly workingProject = $derived(
