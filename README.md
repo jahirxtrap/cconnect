@@ -142,7 +142,7 @@ with the tailnet mode or a public one.
 ### Claude Code
 
 - **The install, managed.** The CLI and its updates, plugins and marketplaces, MCP servers, skills,
-  memories and a user prompt of your own.
+  memories, the output styles, commands and agents you write, and a user prompt of your own.
 - **Install from a link.** MCP servers, plugins, agents and packs from a web page, a message or a
   card Claude offers. See [Install links](https://github.com/jahirxtrap/cconnect/wiki/Install-links).
 - **Accounts and providers.** Several Claude logins on one server, and providers such as Ollama or
